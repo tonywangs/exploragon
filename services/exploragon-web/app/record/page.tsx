@@ -1,10 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Task } from '@/lib/types';
 
 export default function RecordPage() {
+  const searchParams = useSearchParams();
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const [task, setTask] = useState<Task | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -12,6 +16,19 @@ export default function RecordPage() {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+
+  useEffect(() => {
+    // Extract task from URL parameters
+    const taskParam = searchParams.get('task');
+    if (taskParam) {
+      try {
+        const taskData = JSON.parse(decodeURIComponent(taskParam));
+        setTask(taskData);
+      } catch (error) {
+        console.error('Error parsing task data:', error);
+      }
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     //request camera access when component mounts
@@ -88,7 +105,13 @@ export default function RecordPage() {
     // Create FormData to send the file
     const formData = new FormData();
     formData.append('video', videoBlob, 'challenge-video.webm');
-    console.log('FormData created with video');
+    
+    // Add task information for validation
+    if (task) {
+      formData.append('task', JSON.stringify(task));
+    }
+    
+    console.log('FormData created with video and task:', task);
     
     setUploadStatus('uploading');
     setIsUploading(true);
@@ -137,7 +160,29 @@ export default function RecordPage() {
   return (
     <div className="min-h-screen p-8">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Video Validation</h1>
+        <h1 className="text-3xl font-bold mb-8">
+          {task ? `Challenge: ${task.title}` : 'Video Validation'}
+        </h1>
+        
+        {task && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold text-blue-800">{task.title}</h2>
+              <span className={`px-2 py-1 rounded text-sm ${
+                task.difficulty === "easy" ? "bg-green-100 text-green-800" :
+                task.difficulty === "medium" ? "bg-yellow-100 text-yellow-800" :
+                "bg-red-100 text-red-800"
+              }`}>
+                {task.difficulty.charAt(0).toUpperCase() + task.difficulty.slice(1)}
+              </span>
+            </div>
+            <p className="text-blue-700 mb-2">{task.description}</p>
+            <div className="flex items-center justify-between text-sm text-blue-600">
+              <span>📍 {task.location}</span>
+              <span className="font-semibold">{task.points} points</span>
+            </div>
+          </div>
+        )}
         
         <div className="relative aspect-video mb-6 bg-gray-900 rounded-lg overflow-hidden">
           <video
@@ -203,16 +248,29 @@ export default function RecordPage() {
             )}
             {analysisResult && (
               <div className="mt-6 w-full max-w-2xl bg-gray-50 p-4 rounded-lg">
-                <h3 className="text-lg font-semibold mb-3">Video Analysis Results:</h3>
+                <h3 className="text-lg font-semibold mb-3">Challenge Validation Results:</h3>
                 <div className="space-y-2">
-                  <div className={`flex items-center ${analysisResult.isSmiling ? 'text-green-600' : 'text-red-600'}`}>
-                    <span className="font-medium">Smile Detection: </span>
-                    <span className="ml-2">{analysisResult.isSmiling ? '✓ Smiling' : '✗ Not Smiling'}</span>
+                  <div className={`flex items-center ${analysisResult.challengeCompleted ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className="font-medium">Challenge Status: </span>
+                    <span className="ml-2">
+                      {analysisResult.challengeCompleted ? '✓ Challenge Completed!' : '✗ Challenge Not Completed'}
+                    </span>
                   </div>
+                  {task && (
+                    <div className="mt-2 p-3 bg-white rounded border">
+                      <h4 className="font-medium mb-2">Task: {task.title}</h4>
+                      <p className="text-sm text-gray-600 mb-2">{task.description}</p>
+                      <div className="text-xs text-gray-500">
+                        <span className="mr-4">📍 {task.location}</span>
+                        <span className="mr-4">Difficulty: {task.difficulty}</span>
+                        <span>Points: {task.points}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="mt-4 p-3 bg-white rounded border">
-                    <h4 className="font-medium mb-2">Raw Response:</h4>
+                    <h4 className="font-medium mb-2">AI Analysis:</h4>
                     <p className="text-sm whitespace-pre-wrap">
-                      {analysisResult.rawResponse || analysisResult.error || 'No response available'}
+                      {analysisResult.rawResponse || analysisResult.error || 'No analysis available'}
                     </p>
                   </div>
                 </div>

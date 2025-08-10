@@ -45,11 +45,23 @@ export async function POST(request: Request) {
     console.log('Parsing form data...');
     const formData = await request.formData();
     const video = formData.get('video') as File;
+    const taskData = formData.get('task') as string;
+    
     console.log('Video file received:', {
       name: video?.name,
       type: video?.type,
       size: video?.size
     });
+    
+    let task = null;
+    if (taskData) {
+      try {
+        task = JSON.parse(taskData);
+        console.log('Task data received:', task);
+      } catch (error) {
+        console.error('Error parsing task data:', error);
+      }
+    }
     
     if (!video) {
       return NextResponse.json(
@@ -88,7 +100,7 @@ export async function POST(request: Request) {
     const videoUrl = `/uploads/${filename}`;
 
     // Analyze the video with Gemini
-    const analysis = await analyzeVideo(bytes);
+    const analysis = await analyzeVideo(bytes, task);
     
     return NextResponse.json({
       success: true,

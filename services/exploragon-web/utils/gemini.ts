@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { Task } from '@/lib/types';
 
 // Initialize the Gemini API client with the API key
 async function getGeminiAI() {
@@ -21,8 +22,10 @@ async function getGeminiAI() {
 }
 
 // Function to analyze video content
-export async function analyzeVideo(videoData: ArrayBuffer) {
+export async function analyzeVideo(videoData: ArrayBuffer, task?: Task | null) {
   console.log('=== Starting Gemini Analysis ===');
+  console.log('Task for validation:', task);
+  
   try {
     console.log('Getting Gemini client...');
     const genAI = await getGeminiAI();
@@ -34,11 +37,27 @@ export async function analyzeVideo(videoData: ArrayBuffer) {
     const model = genAI.getGenerativeModel({ model: modelName });
     console.log('Gemini model initialized');
 
-    const prompt = `Analyze if the person in this video is smiling.
+    let prompt: string;
+    if (task) {
+      prompt = `Analyze if the person in this video successfully completed the following challenge:
+
+CHALLENGE: ${task.title}
+DESCRIPTION: ${task.description}
+LOCATION: ${task.location}
+DIFFICULTY: ${task.difficulty}
+
+IMPORTANT: You must ONLY respond with one of these exact words:
+- "true" if the person successfully completed the challenge
+- "false" if the person did not complete the challenge
+
+Do not include any other text, explanation, or punctuation in your response.`;
+    } else {
+      prompt = `Analyze if the person in this video is smiling.
 IMPORTANT: You must ONLY respond with one of these exact words:
 - "true" if the person is smiling
 - "false" if the person is not smiling
 Do not include any other text, explanation, or punctuation in your response.`;
+    }
 
     console.log('Converting video data to base64...');
     const videoBase64 = Buffer.from(videoData).toString('base64');
@@ -62,26 +81,35 @@ Do not include any other text, explanation, or punctuation in your response.`;
     console.log('Response after trim:', text.trim());
     console.log('Response after lowercase:', text.toLowerCase().trim());
 
-    // More lenient check for positive responses
-    // Check each condition separately for debugging
+    // Parse the response
     const hasTrue = text.toLowerCase().trim().includes('true');
-    const hasYes = text.toLowerCase().trim().includes('yes');
-    const hasPerson = text.toLowerCase().trim().includes('person');
     
-    console.log('=== Person Detection Debug ===');
-    console.log('Contains "true":', hasTrue);
-    console.log('Contains "yes":', hasYes);
-    console.log('Contains "person":', hasPerson);
-    
-    const isSmiling = hasTrue;
-    console.log('Is person smiling:', isSmiling);
-    console.log('=========================');
+    if (task) {
+      console.log('=== Challenge Validation Debug ===');
+      console.log('Contains "true":', hasTrue);
+      const challengeCompleted = hasTrue;
+      console.log('Challenge completed:', challengeCompleted);
+      console.log('===============================');
 
-    return {
-      success: true,
-      isSmiling: isSmiling,
-      rawResponse: text
-    };
+      return {
+        success: true,
+        challengeCompleted: challengeCompleted,
+        rawResponse: text,
+        task: task
+      };
+    } else {
+      console.log('=== Smile Detection Debug ===');
+      console.log('Contains "true":', hasTrue);
+      const isSmiling = hasTrue;
+      console.log('Is person smiling:', isSmiling);
+      console.log('==========================');
+
+      return {
+        success: true,
+        isSmiling: isSmiling,
+        rawResponse: text
+      };
+    }
 
   } catch (error) {
     console.error('Error analyzing video with Gemini:', error);
