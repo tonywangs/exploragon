@@ -11,6 +11,7 @@ export default function RecordPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
 
   useEffect(() => {
     //request camera access when component mounts
@@ -67,34 +68,62 @@ export default function RecordPage() {
   };
 
   const uploadVideo = async () => {
-    if (recordedChunks.length === 0) return;
+    console.log('=== Starting Video Upload Process ===');
+    
+    if (recordedChunks.length === 0) {
+      console.error('No video chunks recorded');
+      return;
+    }
+    
+    console.log('Number of recorded chunks:', recordedChunks.length);
     
     const videoBlob = new Blob(recordedChunks, {
       type: 'video/webm'
+    });
+    console.log('Video blob created:', {
+      size: videoBlob.size,
+      type: videoBlob.type
     });
 
     // Create FormData to send the file
     const formData = new FormData();
     formData.append('video', videoBlob, 'challenge-video.webm');
+    console.log('FormData created with video');
     
     setUploadStatus('uploading');
     setIsUploading(true);
 
     try {
+      console.log('Sending request to API...');
       const response = await fetch('/api/upload-video', {
         method: 'POST',
         body: formData,
       });
+      console.log('Response received:', {
+        status: response.status,
+        statusText: response.statusText
+      });
 
       if (!response.ok) {
+        console.error('Upload failed with status:', response.status);
         throw new Error('Upload failed');
       }
 
       const data = await response.json();
-      console.log('Upload successful:', data);
+      console.log('=== Upload Response Debug ===');
+      console.log('Success:', data.success);
+      console.log('Message:', data.message);
+      console.log('Video URL:', data.videoUrl);
+      console.log('Analysis:', data.analysis);
+      if (data.analysis) {
+        console.log('Person Detected:', data.analysis.personDetected);
+        console.log('Raw Gemini Response:', data.analysis.rawResponse);
+      }
+      console.log('===========================');
       
       setUploadStatus('success');
       setUploadedVideoUrl(data.videoUrl);
+      setAnalysisResult(data.analysis);
       // Clear recorded chunks after successful upload
       setRecordedChunks([]);
     } catch (error) {
@@ -170,6 +199,23 @@ export default function RecordPage() {
                 >
                   Your browser does not support the video tag.
                 </video>
+              </div>
+            )}
+            {analysisResult && (
+              <div className="mt-6 w-full max-w-2xl bg-gray-50 p-4 rounded-lg">
+                <h3 className="text-lg font-semibold mb-3">Video Analysis Results:</h3>
+                <div className="space-y-2">
+                  <div className={`flex items-center ${analysisResult.isSmiling ? 'text-green-600' : 'text-red-600'}`}>
+                    <span className="font-medium">Smile Detection: </span>
+                    <span className="ml-2">{analysisResult.isSmiling ? '✓ Smiling' : '✗ Not Smiling'}</span>
+                  </div>
+                  <div className="mt-4 p-3 bg-white rounded border">
+                    <h4 className="font-medium mb-2">Raw Response:</h4>
+                    <p className="text-sm whitespace-pre-wrap">
+                      {analysisResult.rawResponse || analysisResult.error || 'No response available'}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>

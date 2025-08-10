@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { writeFile, readdir } from 'fs/promises';
 import path from 'path';
 import fs from 'fs';
+import { analyzeVideo } from '@/utils/gemini';
 
 // Handle GET requests to list videos
 export async function GET() {
@@ -39,13 +40,20 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  console.log('=== API Route: Starting Video Processing ===');
   try {
+    console.log('Parsing form data...');
     const formData = await request.formData();
     const video = formData.get('video') as File;
+    console.log('Video file received:', {
+      name: video?.name,
+      type: video?.type,
+      size: video?.size
+    });
     
     if (!video) {
       return NextResponse.json(
-        { error: 'No video file provided' },
+        { error: 'Video is required' },
         { status: 400 }
       );
     }
@@ -58,29 +66,38 @@ export async function POST(request: Request) {
     const uploadDir = path.join(process.cwd(), 'public', 'uploads');
     const filePath = path.join(uploadDir, filename);
 
-    // Convert the video to a Buffer and save it
+    console.log('Converting video to buffer...');
     const bytes = await video.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    console.log('Buffer created, size:', buffer.length);
     
     // Create uploads directory if it doesn't exist
+    console.log('Checking/creating uploads directory...');
     const fs = require('fs');
     if (!fs.existsSync(uploadDir)){
       fs.mkdirSync(uploadDir, { recursive: true });
+      console.log('Created uploads directory');
     }
 
     // Write the file
+    console.log('Writing file to:', filePath);
     await writeFile(filePath, buffer);
+    console.log('File written successfully');
     
     // Generate the public URL for the video
     const videoUrl = `/uploads/${filename}`;
+
+    // Analyze the video with Gemini
+    const analysis = await analyzeVideo(bytes);
     
     return NextResponse.json({
       success: true,
-      message: 'Video saved successfully',
+      message: 'Video saved and analyzed successfully',
       videoUrl,
       videoName: video.name,
       size: video.size,
-      type: video.type
+      type: video.type,
+      analysis: analysis
     });
 
   } catch (error) {
