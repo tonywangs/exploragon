@@ -1,4 +1,5 @@
 import React from "react";
+import { useRouter } from "next/navigation";
 import { Task } from "../types";
 
 interface TaskModalProps {
@@ -7,6 +8,8 @@ interface TaskModalProps {
 }
 
 export function TaskModal({ task, onClose }: TaskModalProps) {
+  const router = useRouter();
+  
   if (!task) return null;
 
   return (
@@ -43,12 +46,18 @@ export function TaskModal({ task, onClose }: TaskModalProps) {
         <p className="text-sm text-gray-500 mb-4">📍 {task.location}</p>
 
         <div className="flex gap-2">
-          <button className="flex-1 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">
+          <button 
+            onClick={() => {
+              onClose();
+              router.push('/record');
+            }}
+            className="flex-1 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
+          >
             Start Challenge
           </button>
           <button
             onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+            className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
