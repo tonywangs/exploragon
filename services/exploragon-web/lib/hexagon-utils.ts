@@ -49,6 +49,7 @@ export function drawFlatToppedHexGrid(
   maskPolys: google.maps.Polygon[] | null,
   onHexClick: (task: Task) => void,
   hexagonPolygonsRef?: React.MutableRefObject<Map<string, google.maps.Polygon>>,
+  maxHexagons: number = 100, // Limit for mobile performance
 ): HexagonData[] {
   const spherical = google.maps.geometry.spherical;
 
@@ -65,6 +66,7 @@ export function drawFlatToppedHexGrid(
 
   const bearings = [0, 60, 120, 180, 240, 300];
   const hexagonData: HexagonData[] = [];
+  let hexCount = 0;
 
   const tasksByHexagon = new Map<string, Task>();
 
@@ -100,7 +102,7 @@ export function drawFlatToppedHexGrid(
         const hexKey = `${row}-${col}`;
         const task = tasksByHexagon.get(hexKey);
 
-        if (task) {
+        if (task && hexCount < maxHexagons) {
           const path = bearings.map((bearing) =>
             spherical.computeOffset(center, radiusM, bearing),
           );
@@ -136,6 +138,8 @@ export function drawFlatToppedHexGrid(
           if (hexagonPolygonsRef) {
             hexagonPolygonsRef.current.set(hexKey, polygon);
           }
+          
+          hexCount++;
         }
       }
 

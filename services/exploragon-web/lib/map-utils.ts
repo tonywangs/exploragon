@@ -19,6 +19,7 @@ export function createMap(
   google: typeof window.google,
   center: { lat: number; lng: number },
   zoom: number = 12,
+  isMobile: boolean = false,
 ): google.maps.Map {
   return new google.maps.Map(mapElement, {
     center,
@@ -27,6 +28,15 @@ export function createMap(
     gestureHandling: "greedy",
     streetViewControl: false,
     fullscreenControl: false,
+    // Mobile optimizations
+    disableDefaultUI: isMobile,
+    zoomControl: !isMobile,
+    mapTypeControl: false,
+    scaleControl: false,
+    rotateControl: false,
+    // Performance optimizations for mobile
+    minZoom: isMobile ? 10 : 8,
+    maxZoom: isMobile ? 16 : 20,
   });
 }
 
