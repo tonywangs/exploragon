@@ -48,6 +48,7 @@ export function drawFlatToppedHexGrid(
   radiusM: number,
   maskPolys: google.maps.Polygon[] | null,
   onHexClick: (task: Task) => void,
+  hexagonPolygonsRef?: React.MutableRefObject<Map<string, google.maps.Polygon>>,
 ): HexagonData[] {
   const spherical = google.maps.geometry.spherical;
 
@@ -130,6 +131,11 @@ export function drawFlatToppedHexGrid(
           polygon.addListener("click", () => {
             onHexClick(task);
           });
+
+          // Store polygon reference if provided
+          if (hexagonPolygonsRef) {
+            hexagonPolygonsRef.current.set(hexKey, polygon);
+          }
         }
       }
 
@@ -140,4 +146,83 @@ export function drawFlatToppedHexGrid(
   }
 
   return hexagonData;
+}
+
+export function drawCompleteHexGrid(
+  google: typeof window.google,
+  map: google.maps.Map,
+  bbox: BBox,
+  radiusM: number,
+  maskPolys: google.maps.Polygon[] | null,
+  hexagonPolygonsRef?: React.MutableRefObject<Map<string, google.maps.Polygon>>,
+): void {
+  const spherical = google.maps.geometry.spherical;
+
+  const sw = new google.maps.LatLng(bbox[1], bbox[0]);
+  const latMax = bbox[3];
+  const lngMax = bbox[2];
+
+  const isInsideAny = (pt: google.maps.LatLng) => {
+    if (!maskPolys || maskPolys.length === 0) return true;
+    return maskPolys.some((poly) =>
+      google.maps.geometry.poly.containsLocation(pt, poly),
+    );
+  };
+
+  const bearings = [0, 60, 120, 180, 240, 300];
+
+  // Performance optimization: batch polygon creation
+  const polygonsToCreate: Array<{
+    path: google.maps.LatLng[];
+    hexKey: string;
+  }> = [];
+
+  let row = 0;
+  for (;;) {
+    const rowOrigin = spherical.computeOffset(sw, row * DY, 0);
+    if (rowOrigin.lat() > latMax) break;
+
+    const rowOffsetM = row % 2 === 0 ? 0 : DX / 2;
+
+    let col = 0;
+    for (;;) {
+      const baseEastM = rowOffsetM + col * DX;
+      const center = spherical.computeOffset(rowOrigin, baseEastM, 90);
+      if (center.lng() > lngMax) break;
+
+      if (isInsideAny(center)) {
+        const hexKey = `${row}-${col}`;
+        const path = bearings.map((bearing) =>
+          spherical.computeOffset(center, radiusM, bearing),
+        );
+        
+        polygonsToCreate.push({ path, hexKey });
+      }
+
+      col += 1;
+    }
+
+    row += 1;
+  }
+
+  // Batch create polygons for better performance
+  polygonsToCreate.forEach(({ path, hexKey }) => {
+    const polygon = new google.maps.Polygon({
+      paths: path,
+      strokeColor: "#e5e7eb", // Light gray
+      strokeOpacity: 0.3,
+      strokeWeight: 1,
+      fillColor: "#f9fafb", // Very light gray
+      fillOpacity: 0.1,
+      clickable: false,
+      map,
+      zIndex: 0, // Behind everything else
+      visible: false, // Hidden by default
+    });
+
+    // Store polygon reference if provided
+    if (hexagonPolygonsRef) {
+      hexagonPolygonsRef.current.set(hexKey, polygon);
+    }
+  });
 }
