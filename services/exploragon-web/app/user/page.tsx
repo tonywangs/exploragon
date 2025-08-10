@@ -121,6 +121,7 @@ export default function UserPage() {
       const hexKey = `${hexCoord.row}-${hexCoord.col}`;
       setVisitedHexagons((prev) => {
         if (!prev.has(hexKey)) {
+          persistentVisitedHexagons.current.add(hexKey);
           const newSet = new Set([...prev, hexKey]);
           // Highlight the hexagon
           requestAnimationFrame(() => {
@@ -130,19 +131,23 @@ export default function UserPage() {
             if (gridPolygon) {
               gridPolygon.setOptions({
                 fillColor: "#3b82f6", // Blue for visited
-                fillOpacity: 0.5,
+                fillOpacity: 0.6,
                 strokeColor: "#1d4ed8",
-                strokeOpacity: 0.8,
-                strokeWeight: 2,
+                strokeOpacity: 0.9,
+                strokeWeight: 3,
                 visible: true,
+                zIndex: 10, // Above default grid
               });
             }
 
             if (taskPolygon) {
               taskPolygon.setOptions({
                 fillColor: "#10b981", // Green for visited tasks
-                fillOpacity: 0.7,
-                strokeWeight: 3,
+                fillOpacity: 0.8,
+                strokeWeight: 4,
+                strokeColor: "#059669",
+                strokeOpacity: 1.0,
+                zIndex: 20, // Above visited grid hexagons
               });
             }
           });
@@ -238,6 +243,39 @@ export default function UserPage() {
   const [visitedHexagons, setVisitedHexagons] = useState<Set<string>>(
     new Set(),
   );
+  const persistentVisitedHexagons = useRef<Set<string>>(new Set());
+
+  // Function to reapply all visited hexagon highlighting
+  const reapplyVisitedHexagons = useCallback(() => {
+    console.log(`Reapplying ${persistentVisitedHexagons.current.size} visited hexagons`);
+    persistentVisitedHexagons.current.forEach((hexKey) => {
+      const gridPolygon = completeGridPolygonsRef.current.get(hexKey);
+      const taskPolygon = taskHexagonPolygonsRef.current.get(hexKey);
+
+      if (gridPolygon) {
+        gridPolygon.setOptions({
+          fillColor: "#3b82f6", // Blue for visited
+          fillOpacity: 0.6,
+          strokeColor: "#1d4ed8",
+          strokeOpacity: 0.9,
+          strokeWeight: 3,
+          visible: true,
+          zIndex: 10, // Above default grid
+        });
+      }
+
+      if (taskPolygon) {
+        taskPolygon.setOptions({
+          fillColor: "#10b981", // Green for visited tasks
+          fillOpacity: 0.8,
+          strokeWeight: 4,
+          strokeColor: "#059669",
+          strokeOpacity: 1.0,
+          zIndex: 20, // Above visited grid hexagons
+        });
+      }
+    });
+  }, []);
 
   // Function to load and display user's visited hexagons
   const loadVisitedHexagons = useCallback(async () => {
@@ -251,6 +289,8 @@ export default function UserPage() {
         const { history } = data.data[username];
         const newVisitedHexagons = new Set<string>();
 
+        console.log(`Loading history for ${username}: ${history.length} records`);
+        
         history.forEach((record: any) => {
           const hexCoord = findHexagonForCoordinate(
             googleInstanceRef.current!,
@@ -262,31 +302,40 @@ export default function UserPage() {
           if (hexCoord) {
             const hexKey = `${hexCoord.row}-${hexCoord.col}`;
             newVisitedHexagons.add(hexKey);
+            persistentVisitedHexagons.current.add(hexKey);
 
             // Highlight the hexagon
             const gridPolygon = completeGridPolygonsRef.current.get(hexKey);
             const taskPolygon = taskHexagonPolygonsRef.current.get(hexKey);
 
+            console.log(`Hexagon ${hexKey}: gridPolygon=${!!gridPolygon}, taskPolygon=${!!taskPolygon}`);
+
             if (gridPolygon) {
               gridPolygon.setOptions({
                 fillColor: "#3b82f6", // Blue for visited
-                fillOpacity: 0.5,
+                fillOpacity: 0.6,
                 strokeColor: "#1d4ed8",
-                strokeOpacity: 0.8,
-                strokeWeight: 2,
+                strokeOpacity: 0.9,
+                strokeWeight: 3,
                 visible: true,
+                zIndex: 10, // Above default grid
               });
             }
 
             if (taskPolygon) {
               taskPolygon.setOptions({
                 fillColor: "#10b981", // Green for visited tasks
-                fillOpacity: 0.7,
-                strokeWeight: 3,
+                fillOpacity: 0.8,
+                strokeWeight: 4,
+                strokeColor: "#059669",
+                strokeOpacity: 1.0,
+                zIndex: 20, // Above visited grid hexagons
               });
             }
           }
         });
+        
+        console.log(`Total visited hexagons: ${newVisitedHexagons.size}`);
 
         setVisitedHexagons(newVisitedHexagons);
       }
@@ -302,6 +351,7 @@ export default function UserPage() {
     let map: google.maps.Map | null = null;
     const landPolygons: google.maps.Polygon[] = [];
     let cancelled = false;
+    let reapplyInterval: NodeJS.Timeout;
 
     async function init() {
       try {
@@ -361,8 +411,52 @@ export default function UserPage() {
         );
         setHexagons(hexagonData);
 
-        // Load user history
-        loadVisitedHexagons();
+        // Load user history after hexagons are ready
+        setTimeout(() => {
+          loadVisitedHexagons();
+        }, 500);
+
+        // Periodically reapply visited hexagons to ensure they stay visible
+        reapplyInterval = setInterval(() => {
+          reapplyVisitedHexagons();
+        }, 2000);
+
+        // DEBUG: Create some test visited hexagons around SF center
+        setTimeout(() => {
+          const testCoords = [
+            { latitude: 37.7749, longitude: -122.4194 }, // SF center
+            { latitude: 37.7849, longitude: -122.4094 }, // Slightly northeast
+            { latitude: 37.7649, longitude: -122.4294 }, // Slightly southwest
+          ];
+          
+          testCoords.forEach(coords => {
+            const hexCoord = findHexagonForCoordinate(
+              google,
+              { lat: coords.latitude, lng: coords.longitude },
+              SF_BBOX,
+              HEX_RADIUS_M,
+            );
+            
+            if (hexCoord) {
+              const hexKey = `${hexCoord.row}-${hexCoord.col}`;
+              const gridPolygon = completeGridPolygonsRef.current.get(hexKey);
+              
+              console.log(`DEBUG: Creating test visited hexagon ${hexKey}, polygon found: ${!!gridPolygon}`);
+              
+              if (gridPolygon) {
+                gridPolygon.setOptions({
+                  fillColor: "#3b82f6", // Blue for visited
+                  fillOpacity: 0.6,
+                  strokeColor: "#1d4ed8",
+                  strokeOpacity: 0.9,
+                  strokeWeight: 3,
+                  visible: true,
+                  zIndex: 10,
+                });
+              }
+            }
+          });
+        }, 1000);
 
         setMapLoading(false);
         
@@ -390,6 +484,9 @@ export default function UserPage() {
 
     return () => {
       cancelled = true;
+      if (reapplyInterval) {
+        clearInterval(reapplyInterval);
+      }
       landPolygons.forEach((p) => p.setMap(null));
       if (userMarkerRef.current) {
         userMarkerRef.current.setMap(null);

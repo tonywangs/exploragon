@@ -201,14 +201,14 @@ export function drawCompleteHexGrid(
       const polygon = new google.maps.Polygon({
         paths: path,
         strokeColor: "#e5e7eb", // Light gray
-        strokeOpacity: 0.3,
-        strokeWeight: 1,
+        strokeOpacity: 0.5, // More visible strokes
+        strokeWeight: 2, // Thicker for mobile
         fillColor: "#f9fafb", // Very light gray
-        fillOpacity: 0.1,
+        fillOpacity: 0.3, // Higher opacity for better mobile visibility
         clickable: false,
         map,
         zIndex: 0, // Behind everything else
-        visible: false, // Hidden by default
+        visible: true, // Show by default for user page
       });
 
       // Store polygon reference if provided
