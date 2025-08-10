@@ -152,6 +152,7 @@ export default function RecordClient() {
       const blob = new Blob(recordedChunks, { type: 'video/webm' });
       const formData = new FormData();
       formData.append('video', blob, 'challenge-video.webm');
+      formData.append('task', JSON.stringify(task));
 
       const response = await fetch('/api/upload-video', {
         method: 'POST',
@@ -160,15 +161,21 @@ export default function RecordClient() {
 
       if (response.ok) {
         const result = await response.json();
+        console.log("Upload response:", result);
+        
         setUploadedVideoUrl(result.videoUrl);
+        setAnalysisResult(result.analysis);
+        
+        // Show success briefly, then redirect to map
         setUploadStatus("success");
         
-        // Auto-redirect to map page after 3 seconds
+        // Redirect to map page after showing the result briefly
         setTimeout(() => {
           router.push('/user');
-        }, 3000);
+        }, 2000); // Reduced to 2 seconds for better UX
       } else {
-        throw new Error('Upload failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Upload failed');
       }
     } catch (error) {
       console.error("Upload error:", error);
@@ -263,11 +270,11 @@ export default function RecordClient() {
             </div>
           ) : (
             <>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
                 className="w-full h-full object-cover"
               />
               
@@ -390,7 +397,31 @@ export default function RecordClient() {
             </svg>
             <h3 className="font-semibold text-green-300 mb-2">Challenge Submitted!</h3>
             <p className="text-sm text-green-200 mb-4">Your video has been uploaded successfully.</p>
-            <p className="text-xs text-green-300 mb-4">Redirecting to map in 3 seconds...</p>
+            
+            {/* Analysis Result */}
+            {analysisResult && (
+              <div className="mb-4 p-3 bg-slate-700/30 rounded-lg border border-slate-600/30">
+                {analysisResult.success ? (
+                  <div className="text-center">
+                    <p className="text-sm text-cyan-300 mb-2">
+                      {analysisResult.challengeCompleted ? "✅ Challenge Completed!" : "❌ Challenge Not Completed"}
+                    </p>
+                    <p className="text-xs text-slate-300">
+                      AI Analysis: {analysisResult.challengeCompleted ? "Successfully verified" : "Did not meet requirements"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-sm text-yellow-300 mb-2">⚠️ Analysis Pending</p>
+                    <p className="text-xs text-slate-300">
+                      {analysisResult.message || "Video submitted for manual review"}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <p className="text-xs text-green-300 mb-4">Redirecting to map in 2 seconds...</p>
             <button
               onClick={() => router.push('/user')}
               className="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-xl transition-colors"
