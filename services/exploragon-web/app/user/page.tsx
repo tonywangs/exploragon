@@ -77,14 +77,27 @@ function generateHexagonGrid(bbox: number[], hexSize: number) {
   const horizontalSpacing = hexSize * 1.5;
   const verticalSpacing = hexHeight;
 
+  // Calculate the center of the bounding box
+  const centerLng = (lngMin + lngMax) / 2;
+  const centerLat = (latMin + latMax) / 2;
+
+  // Calculate how many hexagons fit in each direction from the center
+  const numHexHorizontal = Math.ceil((lngMax - lngMin) / horizontalSpacing);
+  const numHexVertical = Math.ceil((latMax - latMin) / verticalSpacing);
+
+  // Calculate the starting point to center the grid
+  const startLng = centerLng - (numHexHorizontal * horizontalSpacing) / 2;
+  const startLat = centerLat - (numHexVertical * verticalSpacing) / 2;
+
   let row = 0;
-  let currentLat = latMin;
+  let currentLat = startLat;
 
   while (currentLat < latMax) {
     let col = 0;
-    let currentLng = lngMin;
+    let currentLng = startLng;
 
-    // Offset every other column for pointy-topped hexagon tessellation
+    // Offset every other row for pointy-topped hexagon tessellation
+    // This creates the interlocking pattern needed for hexagons
     if (row % 2 === 1) {
       currentLng += horizontalSpacing / 2;
     }
@@ -179,7 +192,7 @@ function generateHexagonGrid(bbox: number[], hexSize: number) {
       col++;
     }
 
-    currentLat += verticalSpacing * 0.75; // Proper vertical spacing for interlocking hexagons
+    currentLat += verticalSpacing; // Full vertical spacing for even distribution
     row++;
   }
 
@@ -194,10 +207,14 @@ export default function Home() {
 
   useEffect(() => {
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN!;
+    // Calculate the center of the SF bounding box for consistent centering
+    const centerLng = (SF_BBOX[0] + SF_BBOX[2]) / 2;
+    const centerLat = (SF_BBOX[1] + SF_BBOX[3]) / 2;
+
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: [-122.43, 37.77], // Centered on San Francisco
+      center: [centerLng, centerLat], // Centered exactly on the SF bounding box center
       zoom: 13, // Slightly higher zoom to better see the hexagons
       minZoom: 11, // Prevent zooming out too far
       maxZoom: 18, // Allow zooming in for detail
