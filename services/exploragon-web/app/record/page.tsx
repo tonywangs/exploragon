@@ -10,6 +10,7 @@ export default function RecordPage() {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
 
   useEffect(() => {
     //request camera access when component mounts
@@ -93,6 +94,7 @@ export default function RecordPage() {
       console.log('Upload successful:', data);
       
       setUploadStatus('success');
+      setUploadedVideoUrl(data.videoUrl);
       // Clear recorded chunks after successful upload
       setRecordedChunks([]);
     } catch (error) {
@@ -154,8 +156,22 @@ export default function RecordPage() {
           </div>
         )}
         {uploadStatus === 'success' && (
-          <div className="text-green-600 font-medium">
-            Video uploaded successfully!
+          <div className="flex flex-col items-center gap-4">
+            <div className="text-green-600 font-medium">
+              Video uploaded successfully!
+            </div>
+            {uploadedVideoUrl && (
+              <div className="mt-4 w-full max-w-2xl">
+                <h3 className="text-lg font-semibold mb-2">Uploaded Video:</h3>
+                <video 
+                  src={uploadedVideoUrl}
+                  controls
+                  className="w-full rounded-lg"
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            )}
           </div>
         )}
         {uploadStatus === 'error' && (
