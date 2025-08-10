@@ -4,7 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Coords, Task, HexagonData } from "@/lib/types";
 import { GPSManager, startWatching, fetchActiveUsers } from "@/lib/gps-utils";
 import { SF_BBOX, DEFAULT_CENTER, HEX_RADIUS_M } from "@/lib/constants";
-import { drawFlatToppedHexGrid, drawCompleteHexGrid, findHexagonForCoordinate } from "@/lib/hexagon-utils";
+import {
+  drawFlatToppedHexGrid,
+  drawCompleteHexGrid,
+  findHexagonForCoordinate,
+} from "@/lib/hexagon-utils";
 import {
   loadGoogleMaps,
   createMap,
@@ -24,7 +28,7 @@ export default function UserPage() {
   const [, setLastCoords] = useState<Coords | null>(null);
   const [, setStatusMsg] = useState<string>("Choose username to begin");
   const [, setActiveUsers] = useState<Record<string, unknown>>({});
-  
+
   // Map-related state
   const mapRef = useRef<HTMLDivElement | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -37,36 +41,39 @@ export default function UserPage() {
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [loadingStep, setLoadingStep] = useState<string>("Preparing map...");
 
-  const updateUserMarker = useCallback((coords: Coords, map: google.maps.Map, google: typeof window.google) => {
-    if (userMarkerRef.current) {
-      userMarkerRef.current.setPosition({
-        lat: coords.latitude,
-        lng: coords.longitude,
-      });
-    } else {
-      userMarkerRef.current = new google.maps.Marker({
-        position: { lat: coords.latitude, lng: coords.longitude },
-        map,
-        title: `${username} (You)`,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 10,
-          fillColor: "#2563eb",
-          fillOpacity: 1,
-          strokeColor: "#ffffff",
-          strokeWeight: 3,
-        },
-      });
+  const updateUserMarker = useCallback(
+    (coords: Coords, map: google.maps.Map, google: typeof window.google) => {
+      if (userMarkerRef.current) {
+        userMarkerRef.current.setPosition({
+          lat: coords.latitude,
+          lng: coords.longitude,
+        });
+      } else {
+        userMarkerRef.current = new google.maps.Marker({
+          position: { lat: coords.latitude, lng: coords.longitude },
+          map,
+          title: `${username} (You)`,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: "#2563eb",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 3,
+          },
+        });
 
-      const infoWindow = new google.maps.InfoWindow({
-        content: `<div style="font-weight: bold; color: #2563eb;">${username} (You)</div>`,
-      });
+        const infoWindow = new google.maps.InfoWindow({
+          content: `<div style="font-weight: bold; color: #2563eb;">${username} (You)</div>`,
+        });
 
-      userMarkerRef.current.addListener("click", () => {
-        infoWindow.open(map, userMarkerRef.current);
-      });
-    }
-  }, [username]);
+        userMarkerRef.current.addListener("click", () => {
+          infoWindow.open(map, userMarkerRef.current);
+        });
+      }
+    },
+    [username],
+  );
 
   const handleUsernameSubmit = useCallback(() => {
     const inputUsername = usernameInputRef.current?.value?.trim();
@@ -82,24 +89,24 @@ export default function UserPage() {
   // Function to add newly visited hexagon
   const addVisitedHexagon = useCallback((coords: Coords) => {
     if (!googleInstanceRef.current) return;
-    
+
     const hexCoord = findHexagonForCoordinate(
       googleInstanceRef.current,
       { lat: coords.latitude, lng: coords.longitude },
       SF_BBOX,
       HEX_RADIUS_M,
     );
-    
+
     if (hexCoord) {
       const hexKey = `${hexCoord.row}-${hexCoord.col}`;
-      setVisitedHexagons(prev => {
+      setVisitedHexagons((prev) => {
         if (!prev.has(hexKey)) {
           const newSet = new Set([...prev, hexKey]);
           // Highlight the hexagon
           requestAnimationFrame(() => {
             const gridPolygon = completeGridPolygonsRef.current.get(hexKey);
             const taskPolygon = taskHexagonPolygonsRef.current.get(hexKey);
-            
+
             if (gridPolygon) {
               gridPolygon.setOptions({
                 fillColor: "#3b82f6", // Blue for visited
@@ -110,7 +117,7 @@ export default function UserPage() {
                 visible: true,
               });
             }
-            
+
             if (taskPolygon) {
               taskPolygon.setOptions({
                 fillColor: "#10b981", // Green for visited tasks
@@ -126,51 +133,60 @@ export default function UserPage() {
     }
   }, []);
 
-  const sendUpdate = useCallback(async (coords: Coords, map?: google.maps.Map, google?: typeof window.google) => {
-    const gpsManager = new GPSManager(usernameRef, setLastSent, setStatusMsg);
-    await gpsManager.sendUpdate(coords);
-    
-    if (map && google) {
-      updateUserMarker(coords, map, google);
-      // Track visited hexagon in real-time
-      addVisitedHexagon(coords);
-    }
-  }, [updateUserMarker, addVisitedHexagon]);
+  const sendUpdate = useCallback(
+    async (
+      coords: Coords,
+      map?: google.maps.Map,
+      google?: typeof window.google,
+    ) => {
+      const gpsManager = new GPSManager(usernameRef, setLastSent, setStatusMsg);
+      await gpsManager.sendUpdate(coords);
 
-  const startSharing = useCallback((map?: google.maps.Map, google?: typeof window.google) => {
-    if (!("geolocation" in navigator)) {
-      setGpsError("Geolocation not supported on this device");
-      setStatusMsg("Geolocation not supported");
-      return;
-    }
-    if (watchId !== null) return;
+      if (map && google) {
+        updateUserMarker(coords, map, google);
+        // Track visited hexagon in real-time
+        addVisitedHexagon(coords);
+      }
+    },
+    [updateUserMarker, addVisitedHexagon],
+  );
 
-    // Clear any previous GPS errors
-    setGpsError(null);
+  const startSharing = useCallback(
+    (map?: google.maps.Map, google?: typeof window.google) => {
+      if (!("geolocation" in navigator)) {
+        setGpsError("Geolocation not supported on this device");
+        setStatusMsg("Geolocation not supported");
+        return;
+      }
+      if (watchId !== null) return;
 
-    try {
-      const id = startWatching(
-        (coords) => {
-          setLastCoords(coords);
-          setStatusMsg("Sharing location");
-          setGpsError(null); // Clear error on successful location
-          void sendUpdate(coords, map, google);
-        },
-        (err) => {
-          const errorMsg = `GPS Error: ${err.message}`;
-          setGpsError(errorMsg);
-          setStatusMsg(errorMsg);
-        },
-      );
-      setWatchId(id);
-      setStatusMsg("Starting location sharing...");
-    } catch (error) {
-      const errorMsg = "Failed to start location sharing";
-      setGpsError(errorMsg);
-      setStatusMsg(errorMsg);
-    }
-  }, [sendUpdate, watchId]);
+      // Clear any previous GPS errors
+      setGpsError(null);
 
+      try {
+        const id = startWatching(
+          (coords) => {
+            setLastCoords(coords);
+            setStatusMsg("Sharing location");
+            setGpsError(null); // Clear error on successful location
+            void sendUpdate(coords, map, google);
+          },
+          (err) => {
+            const errorMsg = `GPS Error: ${err.message}`;
+            setGpsError(errorMsg);
+            setStatusMsg(errorMsg);
+          },
+        );
+        setWatchId(id);
+        setStatusMsg("Starting location sharing...");
+      } catch (error) {
+        const errorMsg = "Failed to start location sharing";
+        setGpsError(errorMsg);
+        setStatusMsg(errorMsg);
+      }
+    },
+    [sendUpdate, watchId],
+  );
 
   useEffect(() => {
     return () => {
@@ -180,7 +196,7 @@ export default function UserPage() {
 
   useEffect(() => {
     if (!isUsernameSet) return;
-    
+
     const interval = setInterval(async () => {
       const users = await fetchActiveUsers();
       if (users) setActiveUsers(users);
@@ -188,28 +204,33 @@ export default function UserPage() {
     return () => clearInterval(interval);
   }, [isUsernameSet]);
 
-
   // Store map instances for sharing functionality
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const googleInstanceRef = useRef<typeof window.google | null>(null);
 
   // Visited hexagons tracking
-  const completeGridPolygonsRef = useRef<Map<string, google.maps.Polygon>>(new Map());
-  const taskHexagonPolygonsRef = useRef<Map<string, google.maps.Polygon>>(new Map());
-  const [visitedHexagons, setVisitedHexagons] = useState<Set<string>>(new Set());
+  const completeGridPolygonsRef = useRef<Map<string, google.maps.Polygon>>(
+    new Map(),
+  );
+  const taskHexagonPolygonsRef = useRef<Map<string, google.maps.Polygon>>(
+    new Map(),
+  );
+  const [visitedHexagons, setVisitedHexagons] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Function to load and display user's visited hexagons
   const loadVisitedHexagons = useCallback(async () => {
     if (!username || !googleInstanceRef.current) return;
-    
+
     try {
       const response = await fetch(`/api/users-with-history`);
       const data = await response.json();
-      
+
       if (data.ok && data.data[username]) {
         const { history } = data.data[username];
         const newVisitedHexagons = new Set<string>();
-        
+
         history.forEach((record: any) => {
           const hexCoord = findHexagonForCoordinate(
             googleInstanceRef.current!,
@@ -217,15 +238,15 @@ export default function UserPage() {
             SF_BBOX,
             HEX_RADIUS_M,
           );
-          
+
           if (hexCoord) {
             const hexKey = `${hexCoord.row}-${hexCoord.col}`;
             newVisitedHexagons.add(hexKey);
-            
+
             // Highlight the hexagon
             const gridPolygon = completeGridPolygonsRef.current.get(hexKey);
             const taskPolygon = taskHexagonPolygonsRef.current.get(hexKey);
-            
+
             if (gridPolygon) {
               gridPolygon.setOptions({
                 fillColor: "#3b82f6", // Blue for visited
@@ -236,7 +257,7 @@ export default function UserPage() {
                 visible: true,
               });
             }
-            
+
             if (taskPolygon) {
               taskPolygon.setOptions({
                 fillColor: "#10b981", // Green for visited tasks
@@ -246,7 +267,7 @@ export default function UserPage() {
             }
           }
         });
-        
+
         setVisitedHexagons(newVisitedHexagons);
       }
     } catch (error) {
@@ -257,7 +278,7 @@ export default function UserPage() {
   // Initialize map when username is set
   useEffect(() => {
     if (!isUsernameSet) return;
-    
+
     let map: google.maps.Map | null = null;
     let google: typeof window.google | null = null;
     const landPolygons: google.maps.Polygon[] = [];
@@ -272,7 +293,10 @@ export default function UserPage() {
         if (cancelled || !mapRef.current) return;
 
         setLoadingStep("Creating map...");
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isMobile =
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+            navigator.userAgent,
+          );
         map = createMap(mapRef.current, google, DEFAULT_CENTER, 12, isMobile);
         mapInstanceRef.current = map;
         googleInstanceRef.current = google;
@@ -313,9 +337,12 @@ export default function UserPage() {
               requestAnimationFrame(() => {
                 if (!cancelled && google && map) {
                   // Detect mobile for performance optimization
-                  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                  const isMobile =
+                    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                      navigator.userAgent,
+                    );
                   const maxHexagons = isMobile ? 50 : 200;
-                  
+
                   // Draw complete hexagon grid first (for visited hexagons)
                   drawCompleteHexGrid(
                     google!,
@@ -327,10 +354,10 @@ export default function UserPage() {
                   );
 
                   // Make complete grid visible by default for exploration tracking
-                  completeGridPolygonsRef.current.forEach(polygon => {
+                  completeGridPolygonsRef.current.forEach((polygon) => {
                     polygon.setVisible(true);
                   });
-                  
+
                   // Draw task hexagons on top
                   const hexagonData = drawFlatToppedHexGrid(
                     google!,
@@ -348,7 +375,7 @@ export default function UserPage() {
                   setTimeout(() => {
                     loadVisitedHexagons();
                   }, 1000);
-                  
+
                   // Auto-start location sharing
                   if (!watchId) {
                     startSharing(map!, google!);
@@ -361,10 +388,11 @@ export default function UserPage() {
             // Map still works without coastline/hexagons
           }
         }, 100);
-
       } catch (error) {
         console.error("Error initializing map:", error);
-        setMapError("Failed to load map. Please check your internet connection and try again.");
+        setMapError(
+          "Failed to load map. Please check your internet connection and try again.",
+        );
         setMapLoading(false);
       }
     }
@@ -379,11 +407,13 @@ export default function UserPage() {
         userMarkerRef.current = null;
       }
       // Clean up hexagon polygons
-      completeGridPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
+      completeGridPolygonsRef.current.forEach((polygon) =>
+        polygon.setMap(null),
+      );
       completeGridPolygonsRef.current.clear();
       taskHexagonPolygonsRef.current.forEach((polygon) => polygon.setMap(null));
       taskHexagonPolygonsRef.current.clear();
-      
+
       mapInstanceRef.current = null;
       googleInstanceRef.current = null;
     };
@@ -396,7 +426,7 @@ export default function UserPage() {
           <h1 className="text-3xl font-bold mb-2">Welcome to Exploragon</h1>
           <p className="text-gray-600">Choose a username to start playing</p>
         </div>
-        
+
         <div className="bg-white rounded-lg shadow p-6 w-full max-w-md">
           <div className="flex flex-col gap-4">
             <div>
@@ -430,18 +460,10 @@ export default function UserPage() {
   return (
     <div className="relative w-full h-screen">
       {/* Hidden input for GPS manager */}
-      <input
-        ref={usernameRef}
-        type="hidden"
-        value={username}
-        readOnly
-      />
-      
+      <input ref={usernameRef} type="hidden" value={username} readOnly />
+
       {/* Map container */}
-      <div
-        ref={mapRef}
-        className="absolute inset-0 w-full h-full"
-      />
+      <div ref={mapRef} className="absolute inset-0 w-full h-full" />
 
       {/* Loading overlay */}
       {mapLoading && (
@@ -454,9 +476,7 @@ export default function UserPage() {
               <h3 className="text-lg font-semibold text-gray-800 mb-2">
                 Loading Game
               </h3>
-              <p className="text-sm text-gray-600 mb-1">
-                {loadingStep}
-              </p>
+              <p className="text-sm text-gray-600 mb-1">{loadingStep}</p>
               <div className="text-xs text-gray-400">
                 Please wait while we prepare your map...
               </div>
@@ -474,9 +494,7 @@ export default function UserPage() {
               <h3 className="text-lg font-semibold text-red-800 mb-2">
                 Map Loading Failed
               </h3>
-              <p className="text-sm text-red-600 mb-4">
-                {mapError}
-              </p>
+              <p className="text-sm text-red-600 mb-4">{mapError}</p>
               <button
                 onClick={() => {
                   setMapError(null);
@@ -498,7 +516,9 @@ export default function UserPage() {
           <div className="flex items-center">
             <div className="text-yellow-600 mr-2">⚠️</div>
             <div>
-              <p className="text-sm text-yellow-800 font-medium">Location Issue</p>
+              <p className="text-sm text-yellow-800 font-medium">
+                Location Issue
+              </p>
               <p className="text-xs text-yellow-700">{gpsError}</p>
             </div>
           </div>
@@ -511,7 +531,9 @@ export default function UserPage() {
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-blue-500 rounded"></div>
             <div className="text-sm">
-              <span className="font-medium text-gray-800">{visitedHexagons.size}</span>
+              <span className="font-medium text-gray-800">
+                {visitedHexagons.size}
+              </span>
               <span className="text-gray-600 ml-1">areas explored</span>
             </div>
           </div>

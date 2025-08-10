@@ -138,7 +138,7 @@ export function drawFlatToppedHexGrid(
           if (hexagonPolygonsRef) {
             hexagonPolygonsRef.current.set(hexKey, polygon);
           }
-          
+
           hexCount++;
         }
       }
@@ -199,7 +199,7 @@ export function drawCompleteHexGrid(
         const path = bearings.map((bearing) =>
           spherical.computeOffset(center, radiusM, bearing),
         );
-        
+
         polygonsToCreate.push({ path, hexKey });
       }
 

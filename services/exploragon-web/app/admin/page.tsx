@@ -12,8 +12,15 @@ import {
   fitMapToBounds,
 } from "@/lib/map-utils";
 import { TaskModal } from "@/lib/components/TaskModal";
-import { getActiveUsers, ActiveUsersDict, UserLocationHistoryRecord } from "@/lib/redis";
-import { findHexagonForCoordinate, drawCompleteHexGrid } from "@/lib/hexagon-utils";
+import {
+  getActiveUsers,
+  ActiveUsersDict,
+  UserLocationHistoryRecord,
+} from "@/lib/redis";
+import {
+  findHexagonForCoordinate,
+  drawCompleteHexGrid,
+} from "@/lib/hexagon-utils";
 
 function generatePlayerColor(username: string): string {
   let hash = 0;
@@ -33,7 +40,7 @@ function createPlayerMarker(
   onPlayerClick: (username: string) => void,
 ): google.maps.Marker {
   const color = generatePlayerColor(username);
-  
+
   const marker = new google.maps.Marker({
     position: { lat, lng },
     map,
@@ -65,41 +72,49 @@ export default function GoogleHexGridMap() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [, setHexagons] = useState<HexagonData[]>([]);
   const playerMarkersRef = useRef<Map<string, google.maps.Marker>>(new Map());
-  const taskHexagonPolygonsRef = useRef<Map<string, google.maps.Polygon>>(new Map());
-  const completeGridPolygonsRef = useRef<Map<string, google.maps.Polygon>>(new Map());
-  const [selectedPlayerHistory, setSelectedPlayerHistory] = useState<UserLocationHistoryRecord[] | null>(null);
-  const [selectedPlayerName, setSelectedPlayerName] = useState<string | null>(null);
+  const taskHexagonPolygonsRef = useRef<Map<string, google.maps.Polygon>>(
+    new Map(),
+  );
+  const completeGridPolygonsRef = useRef<Map<string, google.maps.Polygon>>(
+    new Map(),
+  );
+  const [selectedPlayerHistory, setSelectedPlayerHistory] = useState<
+    UserLocationHistoryRecord[] | null
+  >(null);
+  const [selectedPlayerName, setSelectedPlayerName] = useState<string | null>(
+    null,
+  );
   const historyMarkersRef = useRef<google.maps.Marker[]>([]);
   const historyPathRef = useRef<google.maps.Polyline | null>(null);
   const [showCompleteGrid, setShowCompleteGrid] = useState<boolean>(false);
 
   const clearPlayerHistory = () => {
     // Clear history markers
-    historyMarkersRef.current.forEach(marker => marker.setMap(null));
+    historyMarkersRef.current.forEach((marker) => marker.setMap(null));
     historyMarkersRef.current = [];
-    
+
     // Clear history path
     if (historyPathRef.current) {
       historyPathRef.current.setMap(null);
       historyPathRef.current = null;
     }
-    
+
     // Reset task hexagon colors
-    taskHexagonPolygonsRef.current.forEach(polygon => {
+    taskHexagonPolygonsRef.current.forEach((polygon) => {
       polygon.setOptions({
         fillColor: "#fca5a5",
         fillOpacity: 0.3,
       });
     });
-    
-    // Reset complete grid hexagon colors  
-    completeGridPolygonsRef.current.forEach(polygon => {
+
+    // Reset complete grid hexagon colors
+    completeGridPolygonsRef.current.forEach((polygon) => {
       polygon.setOptions({
         fillColor: "#f9fafb",
         fillOpacity: 0.1,
       });
     });
-    
+
     setSelectedPlayerHistory(null);
     setSelectedPlayerName(null);
   };
@@ -112,23 +127,26 @@ export default function GoogleHexGridMap() {
     try {
       // Clear previous history
       clearPlayerHistory();
-      
+
       // Fetch user history
       const response = await fetch(`/api/users-with-history`);
       const data = await response.json();
-      
+
       if (data.ok && data.data[username]) {
         const { history } = data.data[username];
         setSelectedPlayerHistory(history);
         setSelectedPlayerName(username);
-        
+
         const playerColor = generatePlayerColor(username);
-        
+
         // Create history markers for path
         const pathCoords: google.maps.LatLng[] = [];
         history.forEach((record, index) => {
           const marker = new google.maps.Marker({
-            position: { lat: record.coords.latitude, lng: record.coords.longitude },
+            position: {
+              lat: record.coords.latitude,
+              lng: record.coords.longitude,
+            },
             map,
             title: `${username} - ${new Date(record.timestamp).toLocaleTimeString()}`,
             icon: {
@@ -141,10 +159,15 @@ export default function GoogleHexGridMap() {
             },
             zIndex: 1000 + index,
           });
-          
+
           historyMarkersRef.current.push(marker);
-          pathCoords.push(new google.maps.LatLng(record.coords.latitude, record.coords.longitude));
-          
+          pathCoords.push(
+            new google.maps.LatLng(
+              record.coords.latitude,
+              record.coords.longitude,
+            ),
+          );
+
           // Find and highlight hexagon
           const hexCoord = findHexagonForCoordinate(
             google,
@@ -152,10 +175,10 @@ export default function GoogleHexGridMap() {
             SF_BBOX,
             HEX_RADIUS_M,
           );
-          
+
           if (hexCoord) {
             const hexKey = `${hexCoord.row}-${hexCoord.col}`;
-            
+
             // Highlight task hexagon if it exists
             const taskPolygon = taskHexagonPolygonsRef.current.get(hexKey);
             if (taskPolygon) {
@@ -165,7 +188,7 @@ export default function GoogleHexGridMap() {
                 strokeWeight: 3,
               });
             }
-            
+
             // Highlight complete grid hexagon if it exists
             const gridPolygon = completeGridPolygonsRef.current.get(hexKey);
             if (gridPolygon) {
@@ -179,7 +202,7 @@ export default function GoogleHexGridMap() {
             }
           }
         });
-        
+
         // Draw path
         if (pathCoords.length > 1) {
           historyPathRef.current = new google.maps.Polyline({
@@ -204,7 +227,7 @@ export default function GoogleHexGridMap() {
     try {
       const activeUsers = await getActiveUsers();
       const activeUsernames = new Set(Object.keys(activeUsers));
-      
+
       // Remove markers for users no longer active
       for (const [username, marker] of playerMarkersRef.current.entries()) {
         if (!activeUsernames.has(username)) {
@@ -212,11 +235,11 @@ export default function GoogleHexGridMap() {
           playerMarkersRef.current.delete(username);
         }
       }
-      
+
       // Update or create markers for active users
       Object.values(activeUsers).forEach((user) => {
         const existingMarker = playerMarkersRef.current.get(user.username);
-        
+
         if (existingMarker) {
           // Update position of existing marker
           existingMarker.setPosition({
@@ -299,7 +322,7 @@ export default function GoogleHexGridMap() {
       setHexagons(hexagonData);
 
       await updatePlayerMarkers(google, map);
-      
+
       intervalId = setInterval(() => {
         if (map) {
           updatePlayerMarkers(google, map);
@@ -314,10 +337,10 @@ export default function GoogleHexGridMap() {
       landPolygons.forEach((p) => p.setMap(null));
       playerMarkersRef.current.forEach((marker) => marker.setMap(null));
       playerMarkersRef.current.clear();
-      
+
       // Clean up history visualizations
       clearPlayerHistory();
-      
+
       if (intervalId) {
         clearInterval(intervalId);
       }
@@ -374,7 +397,7 @@ export default function GoogleHexGridMap() {
             onChange={(e) => {
               setShowCompleteGrid(e.target.checked);
               // Toggle grid visibility
-              completeGridPolygonsRef.current.forEach(polygon => {
+              completeGridPolygonsRef.current.forEach((polygon) => {
                 polygon.setVisible(e.target.checked);
               });
             }}

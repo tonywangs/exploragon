@@ -31,7 +31,7 @@ export default function AdminLayout({
               link2.crossOrigin = 'anonymous';
               document.head.appendChild(link2);
             })();
-          `
+          `,
         }}
       />
       {children}

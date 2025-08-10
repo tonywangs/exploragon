@@ -62,10 +62,10 @@ export async function setUserLocation(
   const redis = await getRedis();
   const key = userKey(record.username);
   const value = JSON.stringify(record);
-  
+
   // Set current location with TTL for active users
   await redis.set(key, value, "EX", ACTIVE_TTL_SECONDS);
-  
+
   // Add to location history
   await addLocationToHistory(record);
 }
@@ -80,17 +80,17 @@ export async function addLocationToHistory(
     timestamp: record.timestamp,
     coords: record.coords,
   };
-  
+
   // Add to sorted set with timestamp as score
   await redis.zadd(historyKey, record.timestamp, JSON.stringify(historyRecord));
-  
+
   // Keep only recent entries
   const count = await redis.zcard(historyKey);
   if (count > MAX_HISTORY_ENTRIES) {
     const toRemove = count - MAX_HISTORY_ENTRIES;
     await redis.zremrangebyrank(historyKey, 0, toRemove - 1);
   }
-  
+
   // Set TTL on history key
   await redis.expire(historyKey, HISTORY_TTL_SECONDS);
 }
@@ -115,7 +115,7 @@ export async function getActiveUsers(): Promise<ActiveUsersDict> {
       "MATCH",
       pattern,
       "COUNT",
-      100,
+      1440,
     );
     cursor = nextCursor;
     if (keys.length === 0) continue;
@@ -141,11 +141,11 @@ export async function getUserLocationHistory(
 ): Promise<UserLocationHistoryRecord[]> {
   const redis = await getRedis();
   const historyKey = userHistoryKey(username);
-  
+
   // Get recent entries (sorted by timestamp desc)
   const count = limit || MAX_HISTORY_ENTRIES;
   const entries = await redis.zrevrange(historyKey, 0, count - 1);
-  
+
   const history: UserLocationHistoryRecord[] = [];
   for (const entry of entries) {
     try {
@@ -155,27 +155,35 @@ export async function getUserLocationHistory(
       // Skip malformed entries
     }
   }
-  
+
   return history;
 }
 
-export async function getAllUsersWithHistory(): Promise<Record<string, {
-  current: UserLocationRecord;
-  history: UserLocationHistoryRecord[];
-}>> {
+export async function getAllUsersWithHistory(): Promise<
+  Record<
+    string,
+    {
+      current: UserLocationRecord;
+      history: UserLocationHistoryRecord[];
+    }
+  >
+> {
   const activeUsers = await getActiveUsers();
-  const result: Record<string, {
-    current: UserLocationRecord;
-    history: UserLocationHistoryRecord[];
-  }> = {};
-  
+  const result: Record<
+    string,
+    {
+      current: UserLocationRecord;
+      history: UserLocationHistoryRecord[];
+    }
+  > = {};
+
   for (const [username, currentLocation] of Object.entries(activeUsers)) {
-    const history = await getUserLocationHistory(username, 50); // Last 50 positions
+    const history = await getUserLocationHistory(username, 5000); // Last 50 positions
     result[username] = {
       current: currentLocation,
       history,
     };
   }
-  
+
   return result;
 }

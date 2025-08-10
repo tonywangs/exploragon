@@ -31,7 +31,7 @@ export default function UserLayout({
               link2.crossOrigin = 'anonymous';
               document.head.appendChild(link2);
             })();
-          `
+          `,
         }}
       />
       {children}

@@ -9,7 +9,7 @@ interface TaskModalProps {
 
 export function TaskModal({ task, onClose }: TaskModalProps) {
   const router = useRouter();
-  
+
   if (!task) return null;
 
   return (
@@ -46,10 +46,12 @@ export function TaskModal({ task, onClose }: TaskModalProps) {
         <p className="text-sm text-gray-500 mb-4">📍 {task.location}</p>
 
         <div className="flex gap-2">
-          <button 
+          <button
             onClick={() => {
               onClose();
-              router.push(`/record?task=${encodeURIComponent(JSON.stringify(task))}`);
+              router.push(
+                `/record?task=${encodeURIComponent(JSON.stringify(task))}`,
+              );
             }}
             className="flex-1 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
           >
