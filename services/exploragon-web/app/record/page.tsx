@@ -8,9 +8,11 @@ export default function RecordPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
 
   useEffect(() => {
-    // Request camera access when component mounts
+    //request camera access when component mounts
     async function setupCamera() {
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -32,7 +34,7 @@ export default function RecordPage() {
 
     setupCamera();
 
-    // Cleanup function
+    //cleanup function
     return () => {
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
@@ -63,24 +65,42 @@ export default function RecordPage() {
     }
   };
 
-  const downloadVideo = () => {
+  const uploadVideo = async () => {
     if (recordedChunks.length === 0) return;
     
-    const blob = new Blob(recordedChunks, {
+    const videoBlob = new Blob(recordedChunks, {
       type: 'video/webm'
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    document.body.appendChild(a);
-    a.style.display = 'none';
-    a.href = url;
-    a.download = 'recorded-video.webm';
-    a.click();
-    URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+
+    // Create FormData to send the file
+    const formData = new FormData();
+    formData.append('video', videoBlob, 'challenge-video.webm');
     
-    // Clear recorded chunks after download
-    setRecordedChunks([]);
+    setUploadStatus('uploading');
+    setIsUploading(true);
+
+    try {
+      const response = await fetch('/api/upload-video', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      console.log('Upload successful:', data);
+      
+      setUploadStatus('success');
+      // Clear recorded chunks after successful upload
+      setRecordedChunks([]);
+    } catch (error) {
+      console.error('Error uploading video:', error);
+      setUploadStatus('error');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -98,32 +118,52 @@ export default function RecordPage() {
           />
         </div>
 
+              <div className="flex flex-col items-center gap-4">
         <div className="flex gap-4 justify-center">
           {!isRecording ? (
             <button
               onClick={startRecording}
-              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              disabled={isUploading}
+              className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Start Recording
             </button>
           ) : (
             <button
               onClick={stopRecording}
-              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              disabled={isUploading}
+              className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Stop Recording
             </button>
           )}
           
-          {recordedChunks.length > 0 && (
+          {recordedChunks.length > 0 && !isUploading && uploadStatus !== 'success' && (
             <button
-              onClick={downloadVideo}
+              onClick={uploadVideo}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Download Recording
+              Upload Video
             </button>
           )}
         </div>
+
+        {uploadStatus === 'uploading' && (
+          <div className="text-blue-600 font-medium">
+            Uploading video...
+          </div>
+        )}
+        {uploadStatus === 'success' && (
+          <div className="text-green-600 font-medium">
+            Video uploaded successfully!
+          </div>
+        )}
+        {uploadStatus === 'error' && (
+          <div className="text-red-600 font-medium">
+            Failed to upload video. Please try again.
+          </div>
+        )}
+      </div>
       </div>
     </div>
   );
