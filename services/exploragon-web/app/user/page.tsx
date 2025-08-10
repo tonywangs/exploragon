@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 
 // San Francisco bounding box roughly (lngMin, latMin, lngMax, latMax)
@@ -9,13 +9,22 @@ const SF_BBOX = [-122.5149, 37.7081, -122.3569, 37.8324];
 // Hexagon grid configuration
 const HEXAGON_SIZE = 0.002; // Adjusted size for pointy-topped hexagons
 
+type Hexagon = {
+  id: string;
+  center: [number, number];
+  vertices: [number, number][];
+  points: number;
+  task: string;
+  completed: boolean;
+};
+
 // Function to generate hexagon vertices around a center point
 function generateHexagonVertices(
   centerLng: number,
   centerLat: number,
   size: number,
-) {
-  const vertices = [];
+): [number, number][] {
+  const vertices: [number, number][] = [];
   // Start at 30 degrees (π/6) for pointy-topped hexagons instead of 0 degrees for flat-topped
   for (let i = 0; i < 6; i++) {
     // Rotate by 60 degrees (π/3) each step, starting at π/6
@@ -62,9 +71,9 @@ function isPointOnLand(lng: number, lat: number): boolean {
 }
 
 // Function to generate hexagon grid centers using offset coordinates
-function generateHexagonGrid(bbox: number[], hexSize: number) {
+function generateHexagonGrid(bbox: number[], hexSize: number): Hexagon[] {
   const [lngMin, latMin, lngMax, latMax] = bbox;
-  const hexagons = [];
+  const hexagons: Hexagon[] = [];
 
   // Calculate hexagon spacing for pointy-topped hexagons
   // For pointy-topped hexagons:
@@ -72,7 +81,7 @@ function generateHexagonGrid(bbox: number[], hexSize: number) {
   // - Height is sqrt(3) * size
   // - Horizontal spacing between centers is 1.5 * size
   // - Vertical spacing between centers is sqrt(3) * size
-  const hexWidth = hexSize * 2;
+  // const hexWidth = hexSize * 2; // width not used currently
   const hexHeight = hexSize * Math.sqrt(3);
   const horizontalSpacing = hexSize * 1.5;
   const verticalSpacing = hexHeight;
@@ -200,10 +209,18 @@ function generateHexagonGrid(bbox: number[], hexSize: number) {
 }
 
 export default function Home() {
-  const mapContainer = useRef<any>(null);
-  const map = useRef<mapboxgl.Map | any>(null);
-  const [hexagons, setHexagons] = useState<any[]>([]);
-  const [selectedHexagon, setSelectedHexagon] = useState<any>(null);
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  type Hexagon = {
+    id: string;
+    center: [number, number];
+    vertices: [number, number][];
+    points: number;
+    task: string;
+    completed: boolean;
+  };
+  const [hexagons, setHexagons] = useState<Hexagon[]>([]);
+  const [selectedHexagon, setSelectedHexagon] = useState<Hexagon | null>(null);
 
   useEffect(() => {
     mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN!;
@@ -212,7 +229,8 @@ export default function Home() {
     const centerLat = (SF_BBOX[1] + SF_BBOX[3]) / 2;
 
     map.current = new mapboxgl.Map({
-      container: mapContainer.current,
+      // Non-null assertion because container ref exists after first render
+      container: mapContainer.current!,
       style: "mapbox://styles/mapbox/streets-v12",
       center: [centerLng, centerLat], // Centered exactly on the SF bounding box center
       zoom: 13, // Slightly higher zoom to better see the hexagons
@@ -226,7 +244,7 @@ export default function Home() {
       setHexagons(hexagonData);
 
       // Add hexagon source
-      map.current.addSource("hexagons", {
+      map.current!.addSource("hexagons", {
         type: "geojson",
         data: {
           type: "FeatureCollection",
@@ -248,7 +266,7 @@ export default function Home() {
       });
 
       // Add hexagon fill layer
-      map.current.addLayer({
+      map.current!.addLayer({
         id: "hexagon-fills",
         type: "fill",
         source: "hexagons",
@@ -279,7 +297,7 @@ export default function Home() {
       });
 
       // Add hexagon border layer
-      map.current.addLayer({
+      map.current!.addLayer({
         id: "hexagon-borders",
         type: "line",
         source: "hexagons",
@@ -295,27 +313,27 @@ export default function Home() {
       });
 
       // Add hover effect for hexagons
-      let hoveredHexagonId = null;
+      let hoveredHexagonId: string | null = null;
 
-      map.current.on("mousemove", "hexagon-fills", (e) => {
-        if (e.features.length > 0) {
+      map.current!.on("mousemove", "hexagon-fills", (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+        if ((e.features?.length ?? 0) > 0) {
           if (hoveredHexagonId !== null) {
-            map.current.setFeatureState(
+            map.current!.setFeatureState(
               { source: "hexagons", id: hoveredHexagonId },
               { hover: false }
             );
           }
-          hoveredHexagonId = e.features[0].properties.id;
-          map.current.setFeatureState(
+          hoveredHexagonId = String((e.features?.[0]?.properties as Record<string, unknown>)?.id ?? "");
+          map.current!.setFeatureState(
             { source: "hexagons", id: hoveredHexagonId },
             { hover: true }
           );
         }
       });
 
-      map.current.on("mouseleave", "hexagon-fills", () => {
+      map.current!.on("mouseleave", "hexagon-fills", () => {
         if (hoveredHexagonId !== null) {
-          map.current.setFeatureState(
+          map.current!.setFeatureState(
             { source: "hexagons", id: hoveredHexagonId },
             { hover: false }
           );
@@ -324,20 +342,19 @@ export default function Home() {
       });
 
       // Add click handler for hexagons
-      map.current.on("click", "hexagon-fills", (e: any) => {
-        const hexagon = hexagonData.find(
-          (hex) => hex.id === e.features[0].properties.id,
-        );
+      map.current!.on("click", "hexagon-fills", (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+        const clickedId = String((e.features?.[0]?.properties as Record<string, unknown>)?.id ?? "");
+        const hexagon = hexagonData.find((hex) => hex.id === clickedId) ?? null;
         setSelectedHexagon(hexagon);
       });
 
       // Change cursor on hover
-      map.current.on("mouseenter", "hexagon-fills", () => {
-        map.current.getCanvas().style.cursor = "pointer";
+      map.current!.on("mouseenter", "hexagon-fills", () => {
+        map.current!.getCanvas().style.cursor = "pointer";
       });
 
-      map.current.on("mouseleave", "hexagon-fills", () => {
-        map.current.getCanvas().style.cursor = "";
+      map.current!.on("mouseleave", "hexagon-fills", () => {
+        map.current!.getCanvas().style.cursor = "";
       });
     });
   }, []);
@@ -350,7 +367,7 @@ export default function Home() {
     setHexagons(updatedHexagons);
 
     // Update map source
-    const updatedData = {
+    const updatedData: GeoJSON.FeatureCollection<GeoJSON.Polygon, { id: string; points: number; task: string; completed: boolean }> = {
       type: "FeatureCollection",
       features: updatedHexagons.map((hex) => ({
         type: "Feature",
@@ -368,7 +385,7 @@ export default function Home() {
       })),
     };
 
-    map.current.getSource("hexagons").setData(updatedData);
+    (map.current!.getSource("hexagons") as mapboxgl.GeoJSONSource).setData(updatedData);
 
     // Show a congratulatory message when completing a hexagon
     const completedHex = updatedHexagons.find(hex => hex.id === hexagonId);
