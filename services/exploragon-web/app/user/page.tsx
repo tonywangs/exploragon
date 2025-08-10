@@ -31,7 +31,7 @@ export default function UserPage() {
 
   // Memoize expensive mobile detection
   const isMobile = useMemo(
-    () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    () => typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
       navigator.userAgent,
     ),
     [],
@@ -364,7 +364,7 @@ export default function UserPage() {
             setHexagons(hexagonData);
 
             // Load complete grid lazily after initial render
-            (typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : setTimeout)(() => {
+            setTimeout(() => {
               if (cancelled || !google || !map) return;
               drawCompleteHexGrid(
                 google,
@@ -374,14 +374,14 @@ export default function UserPage() {
                 landPolygons,
                 completeGridPolygonsRef,
               );
-            }, { timeout: 2000 });
+            }, 2000);
 
             // Load user history in background
-            (typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : setTimeout)(() => {
+            setTimeout(() => {
               if (!cancelled) {
                 loadVisitedHexagons();
               }
-            }, { timeout: 3000 });
+            }, 3000);
 
             // Wait for coastline to finish
             await coastlinePromise;
@@ -426,36 +426,95 @@ export default function UserPage() {
 
   if (!isUsernameSet) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-6 bg-gray-50">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold mb-2">Welcome to Exploragon</h1>
-          <p className="text-gray-600">Choose a username to start playing</p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6 w-full max-w-md">
-          <div className="flex flex-col gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Username
-              </label>
-              <input
-                ref={usernameInputRef}
-                type="text"
-                placeholder="Enter your username"
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleUsernameSubmit();
-                  }
-                }}
-              />
+      <div className="min-h-screen bg-slate-900 hex-pattern flex flex-col items-center justify-center gap-8 p-6">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-blue-900/20 to-slate-900"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 to-transparent"></div>
+        
+        <div className="relative z-10 text-center space-y-6">
+          {/* Logo and Title */}
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative">
+              <div className="w-16 h-16 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg shadow-cyan-500/25">
+                <svg className="w-9 h-9 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-400 rounded-full animate-pulse"></div>
             </div>
-            <button
-              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-              onClick={handleUsernameSubmit}
-            >
-              Start Playing
-            </button>
+            <div>
+              <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">
+                Welcome to 
+                <span className="block bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+                  Exploragon
+                </span>
+              </h1>
+              <p className="text-lg text-slate-400">Choose a username to start your San Francisco adventure</p>
+            </div>
+          </div>
+
+          {/* Username Form */}
+          <div className="bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 w-full max-w-md mx-auto shadow-2xl">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-slate-300 text-left">
+                  Explorer Username
+                </label>
+                <input
+                  ref={usernameInputRef}
+                  type="text"
+                  placeholder="Enter your explorer name"
+                  className="w-full bg-slate-900/50 border border-slate-600 rounded-xl px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all duration-300"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleUsernameSubmit();
+                    }
+                  }}
+                />
+              </div>
+              <button
+                className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-300 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] flex items-center justify-center gap-2"
+                onClick={handleUsernameSubmit}
+              >
+                <span>Start Exploring</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Features Preview */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 max-w-2xl mx-auto">
+            <div className="bg-slate-800/30 backdrop-blur-lg border border-slate-700/30 rounded-xl p-4 text-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-emerald-400 to-green-500 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <svg className="w-4 h-4 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                </svg>
+              </div>
+              <h3 className="text-white font-medium text-sm">Interactive Map</h3>
+              <p className="text-slate-400 text-xs mt-1">Hexagon-based exploration</p>
+            </div>
+            
+            <div className="bg-slate-800/30 backdrop-blur-lg border border-slate-700/30 rounded-xl p-4 text-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-500 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <svg className="w-4 h-4 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                </svg>
+              </div>
+              <h3 className="text-white font-medium text-sm">Photo Challenges</h3>
+              <p className="text-slate-400 text-xs mt-1">AI-verified submissions</p>
+            </div>
+            
+            <div className="bg-slate-800/30 backdrop-blur-lg border border-slate-700/30 rounded-xl p-4 text-center">
+              <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <svg className="w-4 h-4 text-slate-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+                </svg>
+              </div>
+              <h3 className="text-white font-medium text-sm">Earn Points</h3>
+              <p className="text-slate-400 text-xs mt-1">Climb the leaderboard</p>
+            </div>
           </div>
         </div>
       </div>
@@ -472,18 +531,25 @@ export default function UserPage() {
 
       {/* Loading overlay */}
       {mapLoading && (
-        <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4">
+        <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-slate-800/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-8 max-w-sm mx-4 shadow-2xl">
             <div className="text-center">
-              <div className="mb-4">
-                <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto"></div>
+              <div className="mb-6">
+                <div className="w-16 h-16 border-4 border-slate-700 border-t-cyan-400 rounded-full animate-spin mx-auto"></div>
               </div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              <h3 className="text-xl font-semibold text-white mb-3">
                 Loading Game
               </h3>
-              <p className="text-sm text-gray-600 mb-1">{loadingStep}</p>
-              <div className="text-xs text-gray-400">
-                Please wait while we prepare your map...
+              <p className="text-slate-300 mb-2">{loadingStep}</p>
+              <div className="text-xs text-slate-500">
+                Preparing your San Francisco adventure...
+              </div>
+              
+              {/* Progress indicators */}
+              <div className="flex justify-center gap-2 mt-4">
+                <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
               </div>
             </div>
           </div>
@@ -492,21 +558,25 @@ export default function UserPage() {
 
       {/* Error overlay */}
       {mapError && (
-        <div className="absolute inset-0 bg-red-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4 border-l-4 border-red-500">
+        <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-slate-800/90 backdrop-blur-xl border border-red-500/30 rounded-2xl p-8 max-w-sm mx-4 shadow-2xl">
             <div className="text-center">
-              <div className="text-red-500 text-4xl mb-4">⚠️</div>
-              <h3 className="text-lg font-semibold text-red-800 mb-2">
+              <div className="w-16 h-16 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-3">
                 Map Loading Failed
               </h3>
-              <p className="text-sm text-red-600 mb-4">{mapError}</p>
+              <p className="text-slate-300 mb-6">{mapError}</p>
               <button
                 onClick={() => {
                   setMapError(null);
                   setMapLoading(true);
                   window.location.reload();
                 }}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold px-6 py-3 rounded-xl transition-all duration-300 shadow-lg hover:scale-105"
               >
                 Retry
               </button>
@@ -517,14 +587,18 @@ export default function UserPage() {
 
       {/* GPS Error notification */}
       {gpsError && !mapLoading && (
-        <div className="absolute top-4 left-4 right-4 bg-yellow-100 border-l-4 border-yellow-500 p-3 rounded shadow-lg z-40">
-          <div className="flex items-center">
-            <div className="text-yellow-600 mr-2">⚠️</div>
-            <div>
-              <p className="text-sm text-yellow-800 font-medium">
-                Location Issue
+        <div className="absolute top-6 left-6 right-6 bg-yellow-500/10 backdrop-blur-xl border border-yellow-500/30 rounded-xl p-4 shadow-lg z-40">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm text-yellow-300 font-medium">
+                Location Access Issue
               </p>
-              <p className="text-xs text-yellow-700">{gpsError}</p>
+              <p className="text-xs text-yellow-400/80">{gpsError}</p>
             </div>
           </div>
         </div>
@@ -532,18 +606,24 @@ export default function UserPage() {
 
       {/* Exploration progress indicator */}
       {!mapLoading && !mapError && visitedHexagons.size > 0 && (
-        <div className="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-3 z-40">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded"></div>
-            <div className="text-sm">
-              <span className="font-medium text-gray-800">
-                {visitedHexagons.size}
-              </span>
-              <span className="text-gray-600 ml-1">areas explored</span>
+        <div className="absolute bottom-6 left-6 bg-slate-800/90 backdrop-blur-xl border border-slate-700/50 rounded-xl p-4 shadow-lg z-40">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
             </div>
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            Blue hexagons show where you&apos;ve been
+            <div>
+              <div className="text-sm">
+                <span className="font-semibold text-white">
+                  {visitedHexagons.size}
+                </span>
+                <span className="text-slate-300 ml-1">areas explored</span>
+              </div>
+              <div className="text-xs text-slate-400 mt-0.5">
+                Blue hexagons show your journey
+              </div>
+            </div>
           </div>
         </div>
       )}

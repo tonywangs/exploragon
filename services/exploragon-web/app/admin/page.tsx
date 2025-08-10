@@ -155,7 +155,7 @@ export default function GoogleHexGridMap() {
         const pathCoords: google.maps.LatLng[] = [];
         const visitedHexagons = new Set<string>();
 
-        history.forEach((record) => {
+        history.forEach((record: UserLocationHistoryRecord) => {
           pathCoords.push(
             new google.maps.LatLng(
               record.coords.latitude,
