@@ -39,12 +39,10 @@ export async function getRedis(): Promise<Redis> {
       maxRetriesPerRequest: 2,
       enableAutoPipelining: true,
     });
-    client.on("error", (err) => {
-      // eslint-disable-next-line no-console
-      console.error("Redis error:", err);
-    });
+    client.on("error", (err) => console.error("Redis error:", err));
     globalForRedis._redis = client;
   }
+
   return globalForRedis._redis!;
 }
 
@@ -91,7 +89,6 @@ export async function addLocationToHistory(
     await redis.zremrangebyrank(historyKey, 0, toRemove - 1);
   }
 
-  // Set TTL on history key
   await redis.expire(historyKey, HISTORY_TTL_SECONDS);
 }
 

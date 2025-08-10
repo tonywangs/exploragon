@@ -364,7 +364,7 @@ export default function GoogleHexGridMap() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-gray-800">
-                {selectedPlayerName}'s History
+                {selectedPlayerName}&apos;s History
               </h3>
               <p className="text-sm text-gray-600">
                 {selectedPlayerHistory?.length || 0} location points
@@ -382,7 +382,7 @@ export default function GoogleHexGridMap() {
               ● Movement path and exploration area
             </div>
             <div className="text-gray-400">
-              Enable "Show Complete Grid" to see all explored hexagons
+              Enable &#34;Show Complete Grid&#34; to see all explored hexagons
             </div>
           </div>
         </div>
