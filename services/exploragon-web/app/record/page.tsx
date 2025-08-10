@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { setupCamera, createMediaRecorder, uploadVideo, stopAllTracks } from '@/lib/media-utils';
 
 export default function RecordPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -12,47 +13,31 @@ export default function RecordPage() {
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
 
   useEffect(() => {
-    //request camera access when component mounts
-    async function setupCamera() {
-      try {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: true,
-        });
-        
-        if (videoRef.current) {
-          videoRef.current.srcObject = mediaStream;
-        }
+    async function initCamera() {
+      const mediaStream = await setupCamera(videoRef);
+      if (mediaStream) {
         setStream(mediaStream);
-      } catch (err) {
-        console.error('Error accessing camera:', err);
       }
     }
 
-    setupCamera();
-
-    //cleanup function
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
+    initCamera();
   }, []);
+
+  useEffect(() => {
+    return () => {
+      stopAllTracks(stream);
+    };
+  }, [stream]);
 
   const startRecording = () => {
     if (!stream) return;
 
-    const mediaRecorder = new MediaRecorder(stream);
-    mediaRecorderRef.current = mediaRecorder;
-    
-    mediaRecorder.ondataavailable = (event) => {
+    const mediaRecorder = createMediaRecorder(stream, (event) => {
       if (event.data.size > 0) {
         setRecordedChunks(prev => [...prev, event.data]);
       }
-    };
+    });
+    mediaRecorderRef.current = mediaRecorder;
 
     mediaRecorder.start();
     setIsRecording(true);
@@ -65,35 +50,15 @@ export default function RecordPage() {
     }
   };
 
-  const uploadVideo = async () => {
-    if (recordedChunks.length === 0) return;
-    
-    const videoBlob = new Blob(recordedChunks, {
-      type: 'video/webm'
-    });
-
-    // Create FormData to send the file
-    const formData = new FormData();
-    formData.append('video', videoBlob, 'challenge-video.webm');
-    
+  const handleUploadVideo = async () => {
     setUploadStatus('uploading');
     setIsUploading(true);
 
     try {
-      const response = await fetch('/api/upload-video', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const data = await response.json();
+      const data = await uploadVideo(recordedChunks);
       console.log('Upload successful:', data);
       
       setUploadStatus('success');
-      // Clear recorded chunks after successful upload
       setRecordedChunks([]);
     } catch (error) {
       console.error('Error uploading video:', error);
@@ -140,7 +105,7 @@ export default function RecordPage() {
           
           {recordedChunks.length > 0 && !isUploading && uploadStatus !== 'success' && (
             <button
-              onClick={uploadVideo}
+              onClick={handleUploadVideo}
               className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               Upload Video

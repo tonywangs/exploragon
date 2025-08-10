@@ -1,16 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-
-type Coords = {
-  latitude: number;
-  longitude: number;
-  accuracy?: number | null;
-  altitude?: number | null;
-  altitudeAccuracy?: number | null;
-  heading?: number | null;
-  speed?: number | null;
-};
+import { Coords } from "@/lib/types";
+import { GPSManager, startWatching, fetchActiveUsers } from "@/lib/gps-utils";
 
 export default function GpsStreamPage() {
   const usernameRef = useRef<HTMLInputElement | null>(null);
@@ -20,32 +12,9 @@ export default function GpsStreamPage() {
   const [statusMsg, setStatusMsg] = useState<string>("Idle");
   const [activeUsers, setActiveUsers] = useState<Record<string, unknown>>({});
 
-  // Debounce/control send interval
-  const lastSentAtMs = useRef<number>(0);
-  const MIN_INTERVAL_MS = 2000; // throttle to ~1 update / 2s
-
   const sendUpdate = useCallback(async (coords: Coords) => {
-    const username = usernameRef.current?.value?.trim() || "demo-user";
-    const now = Date.now();
-    if (now - lastSentAtMs.current < MIN_INTERVAL_MS) return;
-    lastSentAtMs.current = now;
-
-    try {
-      const res = await fetch("/api/gps-stream", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          username,
-          timestamp: now,
-          coords,
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setLastSent(new Date(now).toLocaleTimeString());
-      setStatusMsg("Sent");
-    } catch (e) {
-      setStatusMsg("Send failed");
-    }
+    const gpsManager = new GPSManager(usernameRef, setLastSent, setStatusMsg);
+    await gpsManager.sendUpdate(coords);
   }, []);
 
   const start = useCallback(() => {
@@ -53,33 +22,17 @@ export default function GpsStreamPage() {
       setStatusMsg("Geolocation not supported");
       return;
     }
-    if (watchId !== null) return; // already running
+    if (watchId !== null) return;
 
-    const id = navigator.geolocation.watchPosition(
-      (pos) => {
-        const coords: Coords = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy ?? null,
-          altitude: pos.coords.altitude ?? null,
-          altitudeAccuracy: pos.coords.altitudeAccuracy ?? null,
-          heading: pos.coords.heading ?? null,
-          speed: pos.coords.speed ?? null,
-        };
+    const id = startWatching(
+      (coords) => {
         setLastCoords(coords);
         setStatusMsg("Got position");
         void sendUpdate(coords);
       },
-      (err: GeolocationPositionError) => {
-        setStatusMsg(`Error: ${err.message}`);
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 1000,
-        timeout: 10000,
-      },
+      (err) => setStatusMsg(`Error: ${err.message}`)
     );
-    setWatchId(id as unknown as number);
+    setWatchId(id);
     setStatusMsg("Watching");
   }, [sendUpdate, watchId]);
 
@@ -97,16 +50,10 @@ export default function GpsStreamPage() {
     };
   }, [watchId]);
 
-  // Optional: poll active users to visualize stored state (dev aid)
   useEffect(() => {
     const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/active-users");
-        const json = await res.json();
-        if (json?.ok && json?.data) setActiveUsers(json.data as Record<string, unknown>);
-      } catch {
-        // ignore
-      }
+      const users = await fetchActiveUsers();
+      if (users) setActiveUsers(users);
     }, 4000);
     return () => clearInterval(interval);
   }, []);
