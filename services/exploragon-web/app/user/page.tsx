@@ -1,440 +1,255 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import mapboxgl from "mapbox-gl";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Coords, Task, HexagonData } from "@/lib/types";
+import { GPSManager, startWatching, fetchActiveUsers } from "@/lib/gps-utils";
+import { SF_BBOX, DEFAULT_CENTER, HEX_RADIUS_M } from "@/lib/constants";
+import { drawFlatToppedHexGrid } from "@/lib/hexagon-utils";
+import {
+  loadGoogleMaps,
+  createMap,
+  loadGeoJSON,
+  createPolygonFromGeoJSON,
+  fitMapToBounds,
+} from "@/lib/map-utils";
+import { TaskModal } from "@/lib/components/TaskModal";
 
-// San Francisco bounding box roughly (lngMin, latMin, lngMax, latMax)
-const SF_BBOX = [-122.5149, 37.7081, -122.3569, 37.8324];
+export default function UserPage() {
+  const [username, setUsername] = useState<string>("");
+  const [isUsernameSet, setIsUsernameSet] = useState<boolean>(false);
+  const usernameInputRef = useRef<HTMLInputElement | null>(null);
+  const usernameRef = useRef<HTMLInputElement | null>(null);
+  const [watchId, setWatchId] = useState<number | null>(null);
+  const [, setLastSent] = useState<string | null>(null);
+  const [, setLastCoords] = useState<Coords | null>(null);
+  const [, setStatusMsg] = useState<string>("Choose username to begin");
+  const [, setActiveUsers] = useState<Record<string, unknown>>({});
+  
+  // Map-related state
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [, setHexagons] = useState<HexagonData[]>([]);
+  const userMarkerRef = useRef<google.maps.Marker | null>(null);
 
-// Hexagon grid configuration
-const HEXAGON_SIZE = 0.002; // Adjusted size for pointy-topped hexagons
+  const updateUserMarker = useCallback((coords: Coords, map: google.maps.Map, google: typeof window.google) => {
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setPosition({
+        lat: coords.latitude,
+        lng: coords.longitude,
+      });
+    } else {
+      userMarkerRef.current = new google.maps.Marker({
+        position: { lat: coords.latitude, lng: coords.longitude },
+        map,
+        title: `${username} (You)`,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: "#2563eb",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 3,
+        },
+      });
 
-// Function to generate hexagon vertices around a center point
-function generateHexagonVertices(
-  centerLng: number,
-  centerLat: number,
-  size: number,
-) {
-  const vertices = [];
-  // Start at 30 degrees (π/6) for pointy-topped hexagons instead of 0 degrees for flat-topped
-  for (let i = 0; i < 6; i++) {
-    // Rotate by 60 degrees (π/3) each step, starting at π/6
-    const angle = (Math.PI / 6) + (i * Math.PI) / 3;
-    const lng = centerLng + size * Math.cos(angle);
-    const lat = centerLat + size * Math.sin(angle);
-    vertices.push([lng, lat]);
-  }
-  // Close the polygon by returning to the first vertex
-  vertices.push(vertices[0]);
-  return vertices;
-}
+      const infoWindow = new google.maps.InfoWindow({
+        content: `<div style="font-weight: bold; color: #2563eb;">${username} (You)</div>`,
+      });
 
-// Function to check if a point is on land (not in the ocean)
-// This is a simplified check - in a real app, you would use more accurate data
-function isPointOnLand(lng: number, lat: number): boolean {
-  // Define a simplified polygon for San Francisco land area
-  // These are approximate coordinates that exclude most of the ocean
-  const sfLandPolygon = [
-    [-122.5149, 37.8080], // Northwest corner
-    [-122.3569, 37.8324], // Northeast corner
-    [-122.3569, 37.7081], // Southeast corner
-    [-122.5149, 37.7081], // Southwest corner
-  ];
-
-  // Check if the point is within the bounding box
-  const inBoundingBox = 
-    lng >= sfLandPolygon[3][0] && lng <= sfLandPolygon[1][0] &&
-    lat >= sfLandPolygon[2][1] && lat <= sfLandPolygon[1][1];
-
-  if (!inBoundingBox) return false;
-
-  // Exclude specific water areas (simplified)
-  // Golden Gate area
-  if (lng < -122.48 && lat > 37.78) return false;
-
-  // Bay area east of the city
-  if (lng > -122.38 && lat < 37.81) return false;
-
-  // Ocean Beach area
-  if (lng < -122.50) return false;
-
-  return true;
-}
-
-// Function to generate hexagon grid centers using offset coordinates
-function generateHexagonGrid(bbox: number[], hexSize: number) {
-  const [lngMin, latMin, lngMax, latMax] = bbox;
-  const hexagons = [];
-
-  // Calculate hexagon spacing for pointy-topped hexagons
-  // For pointy-topped hexagons:
-  // - Width is 2 * size
-  // - Height is sqrt(3) * size
-  // - Horizontal spacing between centers is 1.5 * size
-  // - Vertical spacing between centers is sqrt(3) * size
-  const hexWidth = hexSize * 2;
-  const hexHeight = hexSize * Math.sqrt(3);
-  const horizontalSpacing = hexSize * 1.5;
-  const verticalSpacing = hexHeight;
-
-  // Calculate the center of the bounding box
-  const centerLng = (lngMin + lngMax) / 2;
-  const centerLat = (latMin + latMax) / 2;
-
-  // Calculate how many hexagons fit in each direction from the center
-  const numHexHorizontal = Math.ceil((lngMax - lngMin) / horizontalSpacing);
-  const numHexVertical = Math.ceil((latMax - latMin) / verticalSpacing);
-
-  // Calculate the starting point to center the grid
-  const startLng = centerLng - (numHexHorizontal * horizontalSpacing) / 2;
-  const startLat = centerLat - (numHexVertical * verticalSpacing) / 2;
-
-  let row = 0;
-  let currentLat = startLat;
-
-  while (currentLat < latMax) {
-    let col = 0;
-    let currentLng = startLng;
-
-    // Offset every other row for pointy-topped hexagon tessellation
-    // This creates the interlocking pattern needed for hexagons
-    if (row % 2 === 1) {
-      currentLng += horizontalSpacing / 2;
+      userMarkerRef.current.addListener("click", () => {
+        infoWindow.open(map, userMarkerRef.current);
+      });
     }
+  }, [username]);
 
-    while (currentLng < lngMax) {
-      if (
-        currentLng >= lngMin &&
-        currentLng <= lngMax &&
-        currentLat >= latMin &&
-        currentLat <= latMax &&
-        isPointOnLand(currentLng, currentLat) // Only add hexagons on land
-      ) {
-        const vertices = generateHexagonVertices(
-          currentLng,
-          currentLat,
-          hexSize,
-        );
-
-        // Calculate points based on location - more points for popular areas
-        let points = Math.floor(Math.random() * 30) + 10; // Base points
-        let task = `Take a selfie at this location and share it!`; // Default task
-
-        // Assign specific tasks and points for popular areas
-
-        // Fisherman's Wharf / Pier 39 area
-        if (currentLng > -122.42 && currentLng < -122.40 && 
-            currentLat > 37.805 && currentLat < 37.815) {
-          points += 50;
-          task = `Record a video of yourself doing a sea lion call at Pier 39!`;
-        }
-
-        // Golden Gate Park
-        else if (currentLng > -122.51 && currentLng < -122.45 && 
-            currentLat > 37.765 && currentLat < 37.775) {
-          points += 40;
-          task = `Find a bison in Golden Gate Park and take a photo with it in the background.`;
-        }
-
-        // Downtown / Union Square
-        else if (currentLng > -122.41 && currentLng < -122.39 && 
-            currentLat > 37.785 && currentLat < 37.795) {
-          points += 30;
-          task = `Take a photo with the heart sculpture in Union Square.`;
-        }
-
-        // Chinatown
-        else if (currentLng > -122.41 && currentLng < -122.40 && 
-            currentLat > 37.79 && currentLat < 37.80) {
-          points += 35;
-          task = `Record yourself saying "Hello" in Mandarin at the Dragon Gate.`;
-        }
-
-        // Golden Gate Bridge
-        else if (currentLng > -122.48 && currentLng < -122.46 && 
-            currentLat > 37.80 && currentLat < 37.82) {
-          points += 45;
-          task = `Take a panoramic photo of the Golden Gate Bridge.`;
-        }
-
-        // Alcatraz
-        else if (currentLng > -122.43 && currentLng < -122.41 && 
-            currentLat > 37.825 && currentLat < 37.83) {
-          points += 55;
-          task = `Do your best prison break pose with Alcatraz in the background.`;
-        }
-
-        // Lombard Street
-        else if (currentLng > -122.42 && currentLng < -122.41 && 
-            currentLat > 37.80 && currentLat < 37.81) {
-          points += 35;
-          task = `Take a video walking down the "crookedest street in the world".`;
-        }
-
-        // Painted Ladies / Alamo Square
-        else if (currentLng > -122.44 && currentLng < -122.43 && 
-            currentLat > 37.775 && currentLat < 37.78) {
-          points += 30;
-          task = `Recreate the Full House opening scene at Alamo Square.`;
-        }
-
-        hexagons.push({
-          id: `hex-${row}-${col}`,
-          center: [currentLng, currentLat],
-          vertices: vertices,
-          points: points,
-          task: task,
-          completed: false,
-        });
-      }
-
-      currentLng += horizontalSpacing; // Proper horizontal spacing for pointy-topped hexagons
-      col++;
+  const handleUsernameSubmit = useCallback(() => {
+    const inputUsername = usernameInputRef.current?.value?.trim();
+    if (!inputUsername) {
+      alert("Please enter a username");
+      return;
     }
-
-    currentLat += verticalSpacing; // Full vertical spacing for even distribution
-    row++;
-  }
-
-  return hexagons;
-}
-
-export default function Home() {
-  const mapContainer = useRef<any>(null);
-  const map = useRef<mapboxgl.Map | any>(null);
-  const [hexagons, setHexagons] = useState<any[]>([]);
-  const [selectedHexagon, setSelectedHexagon] = useState<any>(null);
-
-  useEffect(() => {
-    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_PUBLIC_TOKEN!;
-    // Calculate the center of the SF bounding box for consistent centering
-    const centerLng = (SF_BBOX[0] + SF_BBOX[2]) / 2;
-    const centerLat = (SF_BBOX[1] + SF_BBOX[3]) / 2;
-
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v12",
-      center: [centerLng, centerLat], // Centered exactly on the SF bounding box center
-      zoom: 13, // Slightly higher zoom to better see the hexagons
-      minZoom: 11, // Prevent zooming out too far
-      maxZoom: 18, // Allow zooming in for detail
-    });
-
-    map.current.on("load", () => {
-      // Generate hexagon grid
-      const hexagonData = generateHexagonGrid(SF_BBOX, HEXAGON_SIZE);
-      setHexagons(hexagonData);
-
-      // Add hexagon source
-      map.current.addSource("hexagons", {
-        type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: hexagonData.map((hex) => ({
-            type: "Feature",
-            id: hex.id, // Add id at the feature level for feature-state to work
-            properties: {
-              id: hex.id,
-              points: hex.points,
-              task: hex.task,
-              completed: hex.completed,
-            },
-            geometry: {
-              type: "Polygon",
-              coordinates: [hex.vertices],
-            },
-          })),
-        },
-      });
-
-      // Add hexagon fill layer
-      map.current.addLayer({
-        id: "hexagon-fills",
-        type: "fill",
-        source: "hexagons",
-        paint: {
-          "fill-color": [
-            "case",
-            ["get", "completed"],
-            "#10b981", // Green for completed
-            [
-              "interpolate",
-              ["linear"],
-              ["get", "points"],
-              10,
-              "#fef3c7", // Light yellow for low points
-              50,
-              "#fbbf24", // Yellow for medium points
-              100,
-              "#dc2626", // Red for high points
-            ],
-          ],
-          "fill-opacity": [
-            "case",
-            ["boolean", ["feature-state", "hover"], false],
-            0.8, // Higher opacity on hover
-            0.65, // Slightly higher base opacity for better visibility
-          ],
-        },
-      });
-
-      // Add hexagon border layer
-      map.current.addLayer({
-        id: "hexagon-borders",
-        type: "line",
-        source: "hexagons",
-        paint: {
-          "line-color": "#374151",
-          "line-width": [
-            "case",
-            ["boolean", ["feature-state", "hover"], false],
-            3, // Thicker border on hover
-            1.5, // Slightly thinner default border
-          ],
-        },
-      });
-
-      // Add hover effect for hexagons
-      let hoveredHexagonId = null;
-
-      map.current.on("mousemove", "hexagon-fills", (e) => {
-        if (e.features.length > 0) {
-          if (hoveredHexagonId !== null) {
-            map.current.setFeatureState(
-              { source: "hexagons", id: hoveredHexagonId },
-              { hover: false }
-            );
-          }
-          hoveredHexagonId = e.features[0].properties.id;
-          map.current.setFeatureState(
-            { source: "hexagons", id: hoveredHexagonId },
-            { hover: true }
-          );
-        }
-      });
-
-      map.current.on("mouseleave", "hexagon-fills", () => {
-        if (hoveredHexagonId !== null) {
-          map.current.setFeatureState(
-            { source: "hexagons", id: hoveredHexagonId },
-            { hover: false }
-          );
-        }
-        hoveredHexagonId = null;
-      });
-
-      // Add click handler for hexagons
-      map.current.on("click", "hexagon-fills", (e: any) => {
-        const hexagon = hexagonData.find(
-          (hex) => hex.id === e.features[0].properties.id,
-        );
-        setSelectedHexagon(hexagon);
-      });
-
-      // Change cursor on hover
-      map.current.on("mouseenter", "hexagon-fills", () => {
-        map.current.getCanvas().style.cursor = "pointer";
-      });
-
-      map.current.on("mouseleave", "hexagon-fills", () => {
-        map.current.getCanvas().style.cursor = "";
-      });
-    });
+    setUsername(inputUsername);
+    setIsUsernameSet(true);
+    setStatusMsg("Loading map...");
   }, []);
 
-  const completeHexagon = (hexagonId: string) => {
-    // Update hexagon completion status
-    const updatedHexagons = hexagons.map((hex) =>
-      hex.id === hexagonId ? { ...hex, completed: true } : hex,
+  const sendUpdate = useCallback(async (coords: Coords, map?: google.maps.Map, google?: typeof window.google) => {
+    const gpsManager = new GPSManager(usernameRef, setLastSent, setStatusMsg);
+    await gpsManager.sendUpdate(coords);
+    
+    if (map && google) {
+      updateUserMarker(coords, map, google);
+    }
+  }, [updateUserMarker]);
+
+  const startSharing = useCallback((map?: google.maps.Map, google?: typeof window.google) => {
+    if (!("geolocation" in navigator)) {
+      setStatusMsg("Geolocation not supported");
+      return;
+    }
+    if (watchId !== null) return;
+
+    const id = startWatching(
+      (coords) => {
+        setLastCoords(coords);
+        setStatusMsg("Sharing location");
+        void sendUpdate(coords, map, google);
+      },
+      (err) => setStatusMsg(`Error: ${err.message}`),
     );
-    setHexagons(updatedHexagons);
+    setWatchId(id);
+    setStatusMsg("Starting location sharing...");
+  }, [sendUpdate, watchId]);
 
-    // Update map source
-    const updatedData = {
-      type: "FeatureCollection",
-      features: updatedHexagons.map((hex) => ({
-        type: "Feature",
-        id: hex.id, // Include id at feature level for feature-state
-        properties: {
-          id: hex.id,
-          points: hex.points,
-          task: hex.task,
-          completed: hex.completed,
-        },
-        geometry: {
-          type: "Polygon",
-          coordinates: [hex.vertices],
-        },
-      })),
+
+  useEffect(() => {
+    return () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     };
+  }, [watchId]);
 
-    map.current.getSource("hexagons").setData(updatedData);
+  useEffect(() => {
+    if (!isUsernameSet) return;
+    
+    const interval = setInterval(async () => {
+      const users = await fetchActiveUsers();
+      if (users) setActiveUsers(users);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isUsernameSet]);
 
-    // Show a congratulatory message when completing a hexagon
-    const completedHex = updatedHexagons.find(hex => hex.id === hexagonId);
-    if (completedHex) {
-      const pointsEarned = completedHex.points;
-      alert(`Congratulations! You earned ${pointsEarned} points for completing this challenge!`);
+
+  // Store map instances for sharing functionality
+  const mapInstanceRef = useRef<google.maps.Map | null>(null);
+  const googleInstanceRef = useRef<typeof window.google | null>(null);
+
+  // Initialize map when username is set
+  useEffect(() => {
+    if (!isUsernameSet) return;
+    
+    let map: google.maps.Map | null = null;
+    let google: typeof window.google | null = null;
+    const landPolygons: google.maps.Polygon[] = [];
+    let cancelled = false;
+
+    async function initMap() {
+      google = await loadGoogleMaps(
+        process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
+      );
+      if (cancelled || !mapRef.current) return;
+
+      map = createMap(mapRef.current, google, DEFAULT_CENTER);
+      mapInstanceRef.current = map;
+      googleInstanceRef.current = google;
+
+      const geojson = (await loadGeoJSON("/sf-coastline.geojson")) as any;
+      const features =
+        geojson?.type === "FeatureCollection"
+          ? (geojson.features ?? [])
+          : geojson?.type === "Feature"
+            ? [geojson]
+            : [];
+
+      for (const feature of features) {
+        if (feature?.geometry) {
+          const polygons = createPolygonFromGeoJSON(
+            google,
+            feature.geometry,
+            map,
+          );
+          landPolygons.push(...polygons);
+        }
+      }
+
+      fitMapToBounds(map, google, SF_BBOX);
+
+      const hexagonData = drawFlatToppedHexGrid(
+        google,
+        map,
+        SF_BBOX,
+        HEX_RADIUS_M,
+        landPolygons,
+        setSelectedTask,
+      );
+      setHexagons(hexagonData);
+      
+      // Auto-start location sharing
+      if (!watchId) {
+        startSharing(map, google);
+      }
     }
 
-    setSelectedHexagon(null);
-  };
+    initMap();
 
-  return (
-    <div className="relative h-[100vh]">
-      <div ref={mapContainer} className="h-screen w-[100vw]" />
+    return () => {
+      cancelled = true;
+      landPolygons.forEach((p) => p.setMap(null));
+      if (userMarkerRef.current) {
+        userMarkerRef.current.setMap(null);
+        userMarkerRef.current = null;
+      }
+      mapInstanceRef.current = null;
+      googleInstanceRef.current = null;
+    };
+  }, [isUsernameSet, watchId, startSharing]);
 
-      {/* Hexagon Info Panel */}
-      {selectedHexagon && (
-        <div className="absolute top-4 left-4 bg-white p-4 rounded-lg shadow-lg max-w-sm">
-          <h3 className="font-bold text-lg mb-2">Hexagon Challenge</h3>
-          <p className="text-sm text-gray-600 mb-2">
-            Points:{" "}
-            <span className="font-semibold text-blue-600">
-              {selectedHexagon.points}
-            </span>
-          </p>
-          <p className="text-sm mb-3">{selectedHexagon.task}</p>
-          <div className="flex gap-2">
-            {!selectedHexagon.completed ? (
-              <>
-                <button
-                  className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600"
-                  onClick={() => {
-                    /* TODO: Open video submission */
-                  }}
-                >
-                  Submit Video
-                </button>
-                <button
-                  className="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600"
-                  onClick={() => completeHexagon(selectedHexagon.id)}
-                >
-                  Mark Complete
-                </button>
-              </>
-            ) : (
-              <span className="text-green-600 font-semibold">✓ Completed</span>
-            )}
+  if (!isUsernameSet) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-6 p-6 bg-gray-50">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-2">Welcome to Exploragon</h1>
+          <p className="text-gray-600">Choose a username to start playing</p>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow p-6 w-full max-w-md">
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Username
+              </label>
+              <input
+                ref={usernameInputRef}
+                type="text"
+                placeholder="Enter your username"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleUsernameSubmit();
+                  }
+                }}
+              />
+            </div>
             <button
-              className="bg-gray-500 text-white px-3 py-1 rounded text-sm hover:bg-gray-600"
-              onClick={() => setSelectedHexagon(null)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+              onClick={handleUsernameSubmit}
             >
-              Close
+              Start Playing
             </button>
           </div>
         </div>
-      )}
-
-      {/* Score Display */}
-      <div className="absolute top-4 right-4 bg-white p-3 rounded-lg shadow-lg">
-        <div className="text-sm text-gray-600">Total Score</div>
-        <div className="text-2xl font-bold text-blue-600">
-          {hexagons
-            .filter((hex) => hex.completed)
-            .reduce((sum, hex) => sum + hex.points, 0)}
-        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full h-screen">
+      {/* Hidden input for GPS manager */}
+      <input
+        ref={usernameRef}
+        type="hidden"
+        value={username}
+        readOnly
+      />
+      
+      {/* Map container */}
+      <div
+        ref={mapRef}
+        className="absolute inset-0 w-full h-full"
+      />
+
+
+      {/* Task Modal */}
+      <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />
     </div>
   );
 }

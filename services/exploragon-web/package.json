@@ -10,14 +10,17 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@googlemaps/js-api-loader": "^1.16.10",
     "@mapbox/geo-viewport": "^0.5.0",
+    "ioredis": "^5.4.1",
     "mapbox-gl": "^3.14.0",
+    "@types/google.maps": "^3.58.1",
+    "h3-js": "^4.2.1",
     "next": "15.4.6",
     "prettier": "^3.6.2",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-map-gl": "^8.0.4",
-    "react-mapbox-gl": "^5.1.1"
+    "react-map-gl": "^8.0.4"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
