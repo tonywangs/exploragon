@@ -28,7 +28,7 @@ export async function analyzeVideo(videoData: ArrayBuffer) {
     const genAI = await getGeminiAI();
     console.log('Getting Gemini model...');
     
-    // We'll choose the model based on the available models list
+   
     const modelName = "gemini-1.5-pro"; // Using the latest Gemini model
     console.log('Attempting to use model:', modelName);
     const model = genAI.getGenerativeModel({ model: modelName });
