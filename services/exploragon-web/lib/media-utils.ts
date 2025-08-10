@@ -9,13 +9,13 @@ export async function setupCamera(
       },
       audio: true,
     });
-    
+
     if (videoRef.current) {
       videoRef.current.srcObject = mediaStream;
     }
     return mediaStream;
   } catch (err) {
-    console.error('Error accessing camera:', err);
+    console.error("Error accessing camera:", err);
     return null;
   }
 }
@@ -30,22 +30,22 @@ export function createMediaRecorder(
 }
 
 export async function uploadVideo(recordedChunks: Blob[]): Promise<unknown> {
-  if (recordedChunks.length === 0) throw new Error('No video chunks to upload');
-  
+  if (recordedChunks.length === 0) throw new Error("No video chunks to upload");
+
   const videoBlob = new Blob(recordedChunks, {
-    type: 'video/webm'
+    type: "video/webm",
   });
 
   const formData = new FormData();
-  formData.append('video', videoBlob, 'challenge-video.webm');
+  formData.append("video", videoBlob, "challenge-video.webm");
 
-  const response = await fetch('/api/upload-video', {
-    method: 'POST',
+  const response = await fetch("/api/upload-video", {
+    method: "POST",
     body: formData,
   });
 
   if (!response.ok) {
-    throw new Error('Upload failed');
+    throw new Error("Upload failed");
   }
 
   return response.json();
@@ -53,6 +53,6 @@ export async function uploadVideo(recordedChunks: Blob[]): Promise<unknown> {
 
 export function stopAllTracks(stream: MediaStream | null): void {
   if (stream) {
-    stream.getTracks().forEach(track => track.stop());
+    stream.getTracks().forEach((track) => track.stop());
   }
 }

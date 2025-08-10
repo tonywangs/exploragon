@@ -1,4 +1,4 @@
-import { BBox } from './types';
+import { BBox } from "./types";
 
 // San Francisco bounding box (approx)
 export const SF_BBOX: BBox = [-122.5149, 37.7081, -122.3569, 37.8324];

@@ -18,5 +18,3 @@ export async function GET() {
     });
   }
 }
-
-

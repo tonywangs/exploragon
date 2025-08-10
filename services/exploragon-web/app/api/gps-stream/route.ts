@@ -26,13 +26,22 @@ export async function POST(request: Request) {
     }
 
     const { username, timestamp, coords } = body as GpsPayload;
-    const ts = typeof timestamp === "number" ? new Date(timestamp).toISOString() : new Date().toISOString();
+    const ts =
+      typeof timestamp === "number"
+        ? new Date(timestamp).toISOString()
+        : new Date().toISOString();
 
     // Persist to Redis with TTL so the user is considered "active"
-    await setUserLocation({ username, timestamp: timestamp ?? Date.now(), coords });
+    await setUserLocation({
+      username,
+      timestamp: timestamp ?? Date.now(),
+      coords,
+    });
 
     // Log a compact line for server visibility
-    console.log(`[GPS_UPDATE] user=${username} time=${ts} lat=${coords.latitude.toFixed(6)} lng=${coords.longitude.toFixed(6)}`);
+    console.log(
+      `[GPS_UPDATE] user=${username} time=${ts} lat=${coords.latitude.toFixed(6)} lng=${coords.longitude.toFixed(6)}`,
+    );
 
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
@@ -58,5 +67,3 @@ export function OPTIONS() {
     },
   });
 }
-
-

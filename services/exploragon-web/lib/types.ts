@@ -15,7 +15,12 @@ export interface HexagonData {
   completed?: boolean;
 }
 
-export type BBox = [lngMin: number, latMin: number, lngMax: number, latMax: number];
+export type BBox = [
+  lngMin: number,
+  latMin: number,
+  lngMax: number,
+  latMax: number,
+];
 
 export interface Coords {
   latitude: number;

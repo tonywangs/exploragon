@@ -19,7 +19,10 @@ export type UserLocationRecord = {
 export type ActiveUsersDict = Record<string, UserLocationRecord>;
 
 const REDIS_URL = process.env.REDIS_URL || "redis://127.0.0.1:6379";
-export const ACTIVE_TTL_SECONDS = parseInt(process.env.ACTIVE_TTL_SECONDS || "120", 10);
+export const ACTIVE_TTL_SECONDS = parseInt(
+  process.env.ACTIVE_TTL_SECONDS || "120",
+  10,
+);
 
 const globalForRedis = globalThis as unknown as { _redis?: Redis };
 
@@ -42,7 +45,9 @@ function userKey(username: string): string {
   return `gps:user:${username}`;
 }
 
-export async function setUserLocation(record: UserLocationRecord): Promise<void> {
+export async function setUserLocation(
+  record: UserLocationRecord,
+): Promise<void> {
   const redis = getRedis();
   const key = userKey(record.username);
   const value = JSON.stringify(record);
@@ -50,7 +55,9 @@ export async function setUserLocation(record: UserLocationRecord): Promise<void>
   await redis.set(key, value, "EX", ACTIVE_TTL_SECONDS);
 }
 
-export async function getUserLocation(username: string): Promise<UserLocationRecord | null> {
+export async function getUserLocation(
+  username: string,
+): Promise<UserLocationRecord | null> {
   const redis = getRedis();
   const val = await redis.get(userKey(username));
   return val ? (JSON.parse(val) as UserLocationRecord) : null;
@@ -63,7 +70,13 @@ export async function getActiveUsers(): Promise<ActiveUsersDict> {
   const result: ActiveUsersDict = {};
 
   do {
-    const [nextCursor, keys] = await redis.scan(cursor, "MATCH", pattern, "COUNT", 100);
+    const [nextCursor, keys] = await redis.scan(
+      cursor,
+      "MATCH",
+      pattern,
+      "COUNT",
+      100,
+    );
     cursor = nextCursor;
     if (keys.length === 0) continue;
     const values = await redis.mget(keys);
@@ -81,5 +94,3 @@ export async function getActiveUsers(): Promise<ActiveUsersDict> {
 
   return result;
 }
-
-

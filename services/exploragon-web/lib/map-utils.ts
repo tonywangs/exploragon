@@ -1,8 +1,10 @@
-import { BBox } from './types';
+import { BBox } from "./types";
 
-export async function loadGoogleMaps(apiKey: string): Promise<typeof window.google> {
+export async function loadGoogleMaps(
+  apiKey: string,
+): Promise<typeof window.google> {
   const { Loader } = await import("@googlemaps/js-api-loader");
-  
+
   const loader = new Loader({
     apiKey,
     version: "weekly",
@@ -44,7 +46,7 @@ export function createPolygonFromGeoJSON(
   map: google.maps.Map,
 ): google.maps.Polygon[] {
   const polygons: google.maps.Polygon[] = [];
-  
+
   const toLatLngs = (ring: number[][]) =>
     ring.map(([lng, lat]) => ({ lat, lng }));
 

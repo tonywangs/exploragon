@@ -1,5 +1,5 @@
-import { Coords } from './types';
-import { MIN_INTERVAL_MS } from './constants';
+import { Coords } from "./types";
+import { MIN_INTERVAL_MS } from "./constants";
 
 export class GPSManager {
   private usernameRef: React.RefObject<HTMLInputElement | null>;
@@ -69,11 +69,16 @@ export function startWatching(
   return id as unknown as number;
 }
 
-export async function fetchActiveUsers(): Promise<Record<string, unknown> | null> {
+export async function fetchActiveUsers(): Promise<Record<
+  string,
+  unknown
+> | null> {
   try {
     const res = await fetch("/api/active-users");
     const json = await res.json();
-    return json?.ok && json?.data ? (json.data as Record<string, unknown>) : null;
+    return json?.ok && json?.data
+      ? (json.data as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }

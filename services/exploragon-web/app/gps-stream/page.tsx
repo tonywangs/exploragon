@@ -30,7 +30,7 @@ export default function GpsStreamPage() {
         setStatusMsg("Got position");
         void sendUpdate(coords);
       },
-      (err) => setStatusMsg(`Error: ${err.message}`)
+      (err) => setStatusMsg(`Error: ${err.message}`),
     );
     setWatchId(id);
     setStatusMsg("Watching");
@@ -87,7 +87,9 @@ export default function GpsStreamPage() {
       </div>
 
       <div className="w-full max-w-md border rounded p-4 text-sm">
-        <div><span className="font-medium">Status:</span> {statusMsg}</div>
+        <div>
+          <span className="font-medium">Status:</span> {statusMsg}
+        </div>
         <div className="mt-2">
           <span className="font-medium">Last coords:</span>
           {lastCoords ? (
@@ -97,8 +99,12 @@ export default function GpsStreamPage() {
               {lastCoords.accuracy != null && (
                 <div>acc: {Math.round(lastCoords.accuracy)} m</div>
               )}
-              {lastCoords.speed != null && <div>speed: {lastCoords.speed} m/s</div>}
-              {lastCoords.heading != null && <div>heading: {lastCoords.heading}°</div>}
+              {lastCoords.speed != null && (
+                <div>speed: {lastCoords.speed} m/s</div>
+              )}
+              {lastCoords.heading != null && (
+                <div>heading: {lastCoords.heading}°</div>
+              )}
             </div>
           ) : (
             <div className="text-gray-500">none</div>
@@ -109,15 +115,16 @@ export default function GpsStreamPage() {
         </div>
         <div className="mt-4">
           <div className="font-medium mb-1">Active users (from Redis):</div>
-          <pre className="bg-gray-50 rounded p-2 overflow-auto max-h-48 text-xs">{JSON.stringify(activeUsers, null, 2)}</pre>
+          <pre className="bg-gray-50 rounded p-2 overflow-auto max-h-48 text-xs">
+            {JSON.stringify(activeUsers, null, 2)}
+          </pre>
         </div>
       </div>
 
       <p className="text-xs text-gray-500 mt-2 text-center">
-        Keep this page open. Grant location permissions when prompted. Updates are throttled to once every 2 seconds.
+        Keep this page open. Grant location permissions when prompted. Updates
+        are throttled to once every 2 seconds.
       </p>
     </div>
   );
 }
-
-

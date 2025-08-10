@@ -1,6 +1,6 @@
-import { BBox, Task, HexagonData } from './types';
-import { DX, DY } from './constants';
-import { TASKS_BY_LOCATION } from './tasks';
+import { BBox, Task, HexagonData } from "./types";
+import { DX, DY } from "./constants";
+import { TASKS_BY_LOCATION } from "./tasks";
 
 export function findHexagonForCoordinate(
   google: typeof window.google,
