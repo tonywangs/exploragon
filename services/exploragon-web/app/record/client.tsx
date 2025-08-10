@@ -162,6 +162,11 @@ export default function RecordClient() {
         const result = await response.json();
         setUploadedVideoUrl(result.videoUrl);
         setUploadStatus("success");
+        
+        // Auto-redirect to map page after 3 seconds
+        setTimeout(() => {
+          router.push('/user');
+        }, 3000);
       } else {
         throw new Error('Upload failed');
       }
@@ -385,11 +390,12 @@ export default function RecordClient() {
             </svg>
             <h3 className="font-semibold text-green-300 mb-2">Challenge Submitted!</h3>
             <p className="text-sm text-green-200 mb-4">Your video has been uploaded successfully.</p>
+            <p className="text-xs text-green-300 mb-4">Redirecting to map in 3 seconds...</p>
             <button
               onClick={() => router.push('/user')}
               className="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-xl transition-colors"
             >
-              Back to Map
+              Back to Map Now
             </button>
           </div>
         )}
