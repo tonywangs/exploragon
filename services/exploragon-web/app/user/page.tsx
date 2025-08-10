@@ -25,7 +25,7 @@ export default function UserPage() {
   const usernameRef = useRef<HTMLInputElement | null>(null);
   const [watchId, setWatchId] = useState<number | null>(null);
   const [, setLastSent] = useState<string | null>(null);
-  const [, setLastCoords] = useState<Coords | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<Coords | null>(null);
   const [, setStatusMsg] = useState<string>("Choose username to begin");
   const [, setActiveUsers] = useState<Record<string, unknown>>({});
 
@@ -186,7 +186,7 @@ export default function UserPage() {
       try {
         const id = startWatching(
           (coords) => {
-            setLastCoords(coords);
+            setCurrentLocation(coords);
             setStatusMsg("Sharing location");
             setGpsError(null); // Clear error on successful location
             void sendUpdate(coords, map, google);
@@ -613,7 +613,11 @@ export default function UserPage() {
       )}
 
       {/* Task Modal */}
-      <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />
+      <TaskModal 
+        task={selectedTask} 
+        onClose={() => setSelectedTask(null)} 
+        userLocation={currentLocation}
+      />
     </div>
   );
 }

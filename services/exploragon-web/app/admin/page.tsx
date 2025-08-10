@@ -569,7 +569,7 @@ export default function GoogleHexGridMap() {
         </div>
       </div>
 
-      <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} />
+      <TaskModal task={selectedTask} onClose={() => setSelectedTask(null)} userLocation={null} />
     </>
   );
 }

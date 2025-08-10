@@ -1,16 +1,28 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { Task } from "../types";
+import { Coords } from "../types";
+import { calculateDistance } from "../gps-utils";
 
 interface TaskModalProps {
   task: Task | null;
   onClose: () => void;
+  userLocation?: Coords | null;
 }
 
-export const TaskModal = React.memo(function TaskModal({ task, onClose }: TaskModalProps) {
+export const TaskModal = React.memo(function TaskModal({ task, onClose, userLocation }: TaskModalProps) {
   const router = useRouter();
 
   if (!task) return null;
+
+  // Check if user is at the hexagon location (within 100 meters)
+  const isUserAtLocation = userLocation && task.coordinates ? 
+    calculateDistance(
+      userLocation.latitude,
+      userLocation.longitude,
+      task.coordinates.lat,
+      task.coordinates.lng
+    ) <= 100 : false;
 
   const getDifficultyConfig = (difficulty: string) => {
     switch (difficulty) {
@@ -106,6 +118,24 @@ export const TaskModal = React.memo(function TaskModal({ task, onClose }: TaskMo
           </div>
         </div>
 
+        {/* Location Status */}
+        {userLocation && (
+          <div className="flex items-center gap-3 mb-6 p-3 rounded-xl bg-slate-700/30 border border-slate-600/30">
+            <div className={`w-3 h-3 rounded-full ${isUserAtLocation ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+            <div className="text-sm">
+              <span className={`font-medium ${isUserAtLocation ? 'text-green-300' : 'text-yellow-300'}`}>
+                {isUserAtLocation ? 'At location' : 'Not at location'}
+              </span>
+              <div className="text-xs text-slate-400">
+                {isUserAtLocation 
+                  ? 'You can start this challenge!' 
+                  : 'Move closer to start this challenge'
+                }
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Action Buttons */}
         <div className="flex gap-3">
           <button
@@ -115,12 +145,17 @@ export const TaskModal = React.memo(function TaskModal({ task, onClose }: TaskMo
                 `/record?task=${encodeURIComponent(JSON.stringify(task))}`,
               );
             }}
-            className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] flex items-center justify-center gap-2"
+            disabled={!isUserAtLocation}
+            className={`flex-1 font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center gap-2 ${
+              isUserAtLocation
+                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02]'
+                : 'bg-slate-600 text-slate-400 cursor-not-allowed opacity-60'
+            }`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 002 2v8a2 2 0 002 2z" />
             </svg>
-            <span>Start Challenge</span>
+            <span>{isUserAtLocation ? 'Start Challenge' : 'Move Closer'}</span>
           </button>
           <button
             onClick={onClose}
