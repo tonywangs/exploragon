@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
     // Create uploads directory if it doesn't exist
     console.log("Checking/creating uploads directory...");
-    const fs = require("fs");
+    const fs = await import("fs");
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
       console.log("Created uploads directory");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Coords, Task, HexagonData } from "@/lib/types";
 import { GPSManager, startWatching, fetchActiveUsers } from "@/lib/gps-utils";
 import { SF_BBOX, DEFAULT_CENTER, HEX_RADIUS_M } from "@/lib/constants";
@@ -28,6 +28,14 @@ export default function UserPage() {
   const [, setLastCoords] = useState<Coords | null>(null);
   const [, setStatusMsg] = useState<string>("Choose username to begin");
   const [, setActiveUsers] = useState<Record<string, unknown>>({});
+
+  // Memoize expensive mobile detection
+  const isMobile = useMemo(
+    () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent,
+    ),
+    [],
+  );
 
   // Map-related state
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -275,7 +283,7 @@ export default function UserPage() {
     }
   }, [username]);
 
-  // Initialize map when username is set
+  // Performance optimized map initialization
   useEffect(() => {
     if (!isUsernameSet) return;
 
@@ -293,101 +301,98 @@ export default function UserPage() {
         if (cancelled || !mapRef.current) return;
 
         setLoadingStep("Creating map...");
-        const isMobile =
-          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-            navigator.userAgent,
-          );
         map = createMap(mapRef.current, google, DEFAULT_CENTER, 12, isMobile);
         mapInstanceRef.current = map;
         googleInstanceRef.current = google;
 
-        // Show map immediately - this gives visual feedback
+        // Show map immediately for instant feedback
         setMapLoading(false);
+        
+        // Start location sharing immediately for better UX
+        if (!watchId) {
+          startSharing(map!, google!);
+        }
 
-        // Load additional features asynchronously without blocking
-        setTimeout(async () => {
+        // Load features progressively without blocking
+        const loadFeatures = async () => {
           try {
             if (cancelled) return;
 
-            setLoadingStep("Loading coastline data...");
-            const geojson = (await loadGeoJSON("/sf-coastline.geojson")) as any;
-            const features =
-              geojson?.type === "FeatureCollection"
-                ? (geojson.features ?? [])
-                : geojson?.type === "Feature"
-                  ? [geojson]
-                  : [];
+            // Load coastline in background (non-blocking)
+            const coastlinePromise = loadGeoJSON("/sf-coastline.geojson")
+              .then((geojson: any) => {
+                if (cancelled) return;
+                const features =
+                  geojson?.type === "FeatureCollection"
+                    ? (geojson.features ?? [])
+                    : geojson?.type === "Feature"
+                      ? [geojson]
+                      : [];
 
-            for (const feature of features) {
-              if (feature?.geometry && !cancelled && google && map) {
-                const polygons = createPolygonFromGeoJSON(
-                  google,
-                  feature.geometry,
-                  map,
-                );
-                landPolygons.push(...polygons);
-              }
-            }
-
-            if (!cancelled && google && map) {
-              fitMapToBounds(map, google, SF_BBOX);
-
-              setLoadingStep("Drawing game areas...");
-              // Use requestAnimationFrame to avoid blocking the main thread
-              requestAnimationFrame(() => {
-                if (!cancelled && google && map) {
-                  // Detect mobile for performance optimization
-                  const isMobile =
-                    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-                      navigator.userAgent,
+                for (const feature of features) {
+                  if (feature?.geometry && !cancelled && google && map) {
+                    const polygons = createPolygonFromGeoJSON(
+                      google,
+                      feature.geometry,
+                      map,
                     );
-                  const maxHexagons = isMobile ? 50 : 200;
-
-                  // Draw complete hexagon grid first (for visited hexagons)
-                  drawCompleteHexGrid(
-                    google!,
-                    map!,
-                    SF_BBOX,
-                    HEX_RADIUS_M,
-                    landPolygons,
-                    completeGridPolygonsRef,
-                  );
-
-                  // Make complete grid visible by default for exploration tracking
-                  completeGridPolygonsRef.current.forEach((polygon) => {
-                    polygon.setVisible(true);
-                  });
-
-                  // Draw task hexagons on top
-                  const hexagonData = drawFlatToppedHexGrid(
-                    google!,
-                    map!,
-                    SF_BBOX,
-                    HEX_RADIUS_M,
-                    landPolygons,
-                    setSelectedTask,
-                    taskHexagonPolygonsRef,
-                    maxHexagons,
-                  );
-                  setHexagons(hexagonData);
-
-                  // Load user's visited hexagons from history
-                  setTimeout(() => {
-                    loadVisitedHexagons();
-                  }, 1000);
-
-                  // Auto-start location sharing
-                  if (!watchId) {
-                    startSharing(map!, google!);
+                    landPolygons.push(...polygons);
                   }
                 }
+
+                if (!cancelled && google && map) {
+                  fitMapToBounds(map, google, SF_BBOX);
+                }
+              })
+              .catch((error) => {
+                console.warn("Coastline loading failed, continuing without:", error);
               });
-            }
+
+            // Draw only task hexagons initially (much faster)
+            const maxHexagons = isMobile ? 30 : 100; // Reduced for faster initial load
+
+            const hexagonData = drawFlatToppedHexGrid(
+              google!,
+              map!,
+              SF_BBOX,
+              HEX_RADIUS_M,
+              [], // Start without coastline mask for speed
+              setSelectedTask,
+              taskHexagonPolygonsRef,
+              maxHexagons,
+            );
+            setHexagons(hexagonData);
+
+            // Load complete grid lazily after initial render
+            (typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : setTimeout)(() => {
+              if (cancelled || !google || !map) return;
+              drawCompleteHexGrid(
+                google,
+                map,
+                SF_BBOX,
+                HEX_RADIUS_M,
+                landPolygons,
+                completeGridPolygonsRef,
+              );
+            }, { timeout: 2000 });
+
+            // Load user history in background
+            (typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : setTimeout)(() => {
+              if (!cancelled) {
+                loadVisitedHexagons();
+              }
+            }, { timeout: 3000 });
+
+            // Wait for coastline to finish
+            await coastlinePromise;
           } catch (error) {
             console.error("Error loading map features:", error);
-            // Map still works without coastline/hexagons
+            // Map still works without additional features
           }
-        }, 100);
+        };
+
+        // Start loading features without blocking
+        loadFeatures();
       } catch (error) {
         console.error("Error initializing map:", error);
         setMapError(
@@ -417,7 +422,7 @@ export default function UserPage() {
       mapInstanceRef.current = null;
       googleInstanceRef.current = null;
     };
-  }, [isUsernameSet, watchId, startSharing]);
+  }, [isUsernameSet, watchId, startSharing, loadVisitedHexagons, isMobile]);
 
   if (!isUsernameSet) {
     return (

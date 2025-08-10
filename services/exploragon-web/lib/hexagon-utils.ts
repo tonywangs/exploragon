@@ -41,6 +41,7 @@ export function findHexagonForCoordinate(
   return null;
 }
 
+// Optimized task hexagon creation - only creates what's needed
 export function drawFlatToppedHexGrid(
   google: typeof window.google,
   map: google.maps.Map,
@@ -52,10 +53,8 @@ export function drawFlatToppedHexGrid(
   maxHexagons: number = 100, // Limit for mobile performance
 ): HexagonData[] {
   const spherical = google.maps.geometry.spherical;
-
-  const sw = new google.maps.LatLng(bbox[1], bbox[0]);
-  const latMax = bbox[3];
-  const lngMax = bbox[2];
+  const bearings = [0, 60, 120, 180, 240, 300];
+  const hexagonData: HexagonData[] = [];
 
   const isInsideAny = (pt: google.maps.LatLng) => {
     if (!maskPolys || maskPolys.length === 0) return true;
@@ -64,94 +63,74 @@ export function drawFlatToppedHexGrid(
     );
   };
 
-  const bearings = [0, 60, 120, 180, 240, 300];
-  const hexagonData: HexagonData[] = [];
+  // Optimized approach: Process tasks directly instead of scanning grid
   let hexCount = 0;
-
-  const tasksByHexagon = new Map<string, Task>();
-
-  // First pass: find hexagon coordinates for each task
   for (const task of TASKS_BY_LOCATION) {
+    if (hexCount >= maxHexagons) break;
+
     const hexCoord = findHexagonForCoordinate(
       google,
       task.coordinates,
       bbox,
       radiusM,
     );
-    if (hexCoord) {
-      const hexKey = `${hexCoord.row}-${hexCoord.col}`;
-      tasksByHexagon.set(hexKey, task);
-    }
-  }
+    
+    if (!hexCoord) continue;
 
-  // Second pass: only create hexagons that have tasks
-  let row = 0;
-  for (;;) {
-    const rowOrigin = spherical.computeOffset(sw, row * DY, 0);
-    if (rowOrigin.lat() > latMax) break;
+    // Calculate center for this hexagon
+    const sw = new google.maps.LatLng(bbox[1], bbox[0]);
+    const rowOrigin = spherical.computeOffset(sw, hexCoord.row * DY, 0);
+    const rowOffsetM = hexCoord.row % 2 === 0 ? 0 : DX / 2;
+    const baseEastM = rowOffsetM + hexCoord.col * DX;
+    const center = spherical.computeOffset(rowOrigin, baseEastM, 90);
 
-    const rowOffsetM = row % 2 === 0 ? 0 : DX / 2;
+    if (!isInsideAny(center)) continue;
 
-    let col = 0;
-    for (;;) {
-      const baseEastM = rowOffsetM + col * DX;
-      const center = spherical.computeOffset(rowOrigin, baseEastM, 90);
-      if (center.lng() > lngMax) break;
+    const hexKey = `${hexCoord.row}-${hexCoord.col}`;
+    
+    // Skip if already created
+    if (hexagonPolygonsRef?.current.has(hexKey)) continue;
 
-      if (isInsideAny(center)) {
-        const hexKey = `${row}-${col}`;
-        const task = tasksByHexagon.get(hexKey);
+    const path = bearings.map((bearing) =>
+      spherical.computeOffset(center, radiusM, bearing),
+    );
 
-        if (task && hexCount < maxHexagons) {
-          const path = bearings.map((bearing) =>
-            spherical.computeOffset(center, radiusM, bearing),
-          );
+    const hexData: HexagonData = {
+      id: `hex-${hexCoord.row}-${hexCoord.col}`,
+      center: { lat: center.lat(), lng: center.lng() },
+      task,
+      completed: false,
+    };
+    hexagonData.push(hexData);
 
-          const hexData: HexagonData = {
-            id: `hex-${row}-${col}`,
-            center: { lat: center.lat(), lng: center.lng() },
-            task,
-            completed: false,
-          };
-          hexagonData.push(hexData);
+    const polygon = new google.maps.Polygon({
+      paths: path,
+      strokeColor: "#dc2626",
+      strokeOpacity: 0.8,
+      strokeWeight: 2,
+      fillColor: "#fca5a5",
+      fillOpacity: 0.3,
+      clickable: true,
+      map,
+      zIndex: 10, // Above base grid
+    });
 
-          const strokeColor = "#dc2626";
-          const fillColor = "#fca5a5";
-          const fillOpacity = 0.3;
+    polygon.addListener("click", () => {
+      onHexClick(task);
+    });
 
-          const polygon = new google.maps.Polygon({
-            paths: path,
-            strokeColor,
-            strokeOpacity: 0.8,
-            strokeWeight: 2,
-            fillColor,
-            fillOpacity,
-            clickable: true,
-            map,
-          });
-
-          polygon.addListener("click", () => {
-            onHexClick(task);
-          });
-
-          // Store polygon reference if provided
-          if (hexagonPolygonsRef) {
-            hexagonPolygonsRef.current.set(hexKey, polygon);
-          }
-
-          hexCount++;
-        }
-      }
-
-      col += 1;
+    // Store polygon reference if provided
+    if (hexagonPolygonsRef) {
+      hexagonPolygonsRef.current.set(hexKey, polygon);
     }
 
-    row += 1;
+    hexCount++;
   }
 
   return hexagonData;
 }
 
+// Progressive hexagon grid creation for better performance
 export function drawCompleteHexGrid(
   google: typeof window.google,
   map: google.maps.Map,
@@ -175,8 +154,8 @@ export function drawCompleteHexGrid(
 
   const bearings = [0, 60, 120, 180, 240, 300];
 
-  // Performance optimization: batch polygon creation
-  const polygonsToCreate: Array<{
+  // Calculate all hexagon coordinates first (fast)
+  const hexagonCoords: Array<{
     path: google.maps.LatLng[];
     hexKey: string;
   }> = [];
@@ -200,7 +179,7 @@ export function drawCompleteHexGrid(
           spherical.computeOffset(center, radiusM, bearing),
         );
 
-        polygonsToCreate.push({ path, hexKey });
+        hexagonCoords.push({ path, hexKey });
       }
 
       col += 1;
@@ -209,24 +188,43 @@ export function drawCompleteHexGrid(
     row += 1;
   }
 
-  // Batch create polygons for better performance
-  polygonsToCreate.forEach(({ path, hexKey }) => {
-    const polygon = new google.maps.Polygon({
-      paths: path,
-      strokeColor: "#e5e7eb", // Light gray
-      strokeOpacity: 0.3,
-      strokeWeight: 1,
-      fillColor: "#f9fafb", // Very light gray
-      fillOpacity: 0.1,
-      clickable: false,
-      map,
-      zIndex: 0, // Behind everything else
-      visible: false, // Hidden by default
-    });
+  // Create polygons progressively to avoid blocking
+  const BATCH_SIZE = 20; // Create 20 polygons per frame
+  let currentIndex = 0;
 
-    // Store polygon reference if provided
-    if (hexagonPolygonsRef) {
-      hexagonPolygonsRef.current.set(hexKey, polygon);
+  const createNextBatch = () => {
+    const endIndex = Math.min(currentIndex + BATCH_SIZE, hexagonCoords.length);
+    
+    for (let i = currentIndex; i < endIndex; i++) {
+      const { path, hexKey } = hexagonCoords[i];
+      
+      const polygon = new google.maps.Polygon({
+        paths: path,
+        strokeColor: "#e5e7eb", // Light gray
+        strokeOpacity: 0.3,
+        strokeWeight: 1,
+        fillColor: "#f9fafb", // Very light gray
+        fillOpacity: 0.1,
+        clickable: false,
+        map,
+        zIndex: 0, // Behind everything else
+        visible: false, // Hidden by default
+      });
+
+      // Store polygon reference if provided
+      if (hexagonPolygonsRef) {
+        hexagonPolygonsRef.current.set(hexKey, polygon);
+      }
     }
-  });
+
+    currentIndex = endIndex;
+    
+    // Continue creating batches until all are done
+    if (currentIndex < hexagonCoords.length) {
+      requestAnimationFrame(createNextBatch);
+    }
+  };
+
+  // Start progressive creation
+  requestAnimationFrame(createNextBatch);
 }

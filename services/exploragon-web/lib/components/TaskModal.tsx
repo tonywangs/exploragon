@@ -7,7 +7,7 @@ interface TaskModalProps {
   onClose: () => void;
 }
 
-export function TaskModal({ task, onClose }: TaskModalProps) {
+export const TaskModal = React.memo(function TaskModal({ task, onClose }: TaskModalProps) {
   const router = useRouter();
 
   if (!task) return null;
@@ -67,4 +67,4 @@ export function TaskModal({ task, onClose }: TaskModalProps) {
       </div>
     </div>
   );
-}
+});
