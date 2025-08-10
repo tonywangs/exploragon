@@ -17,6 +17,13 @@ import {
   ActiveUsersDict,
   UserLocationHistoryRecord,
 } from "@/lib/redis";
+
+interface LeaderboardEntry {
+  username: string;
+  hexagonsExplored: number;
+  lastActive: string | null;
+  totalPoints: number;
+}
 import {
   findHexagonForCoordinate,
   drawCompleteHexGrid,
@@ -87,6 +94,11 @@ export default function GoogleHexGridMap() {
   const historyMarkersRef = useRef<google.maps.Marker[]>([]);
   const historyPathRef = useRef<google.maps.Polyline | null>(null);
   const [showCompleteGrid, setShowCompleteGrid] = useState<boolean>(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardStats, setLeaderboardStats] = useState<{
+    totalUsers: number;
+    totalUniqueHexagons: number;
+  }>({ totalUsers: 0, totalUniqueHexagons: 0 });
 
   const clearPlayerHistory = () => {
     // Clear history markers
@@ -269,6 +281,7 @@ export default function GoogleHexGridMap() {
     const landPolygons: google.maps.Polygon[] = [];
     let cancelled = false;
     let intervalId: NodeJS.Timeout;
+    let leaderboardInterval: NodeJS.Timeout;
 
     async function init() {
       const google = await loadGoogleMaps(
@@ -328,6 +341,26 @@ export default function GoogleHexGridMap() {
           updatePlayerMarkers(google, map);
         }
       }, 1000);
+
+      // Fetch leaderboard initially and then every 5 seconds
+      const fetchLeaderboard = async () => {
+        try {
+          const response = await fetch('/api/leaderboard');
+          const data = await response.json();
+          if (data.ok) {
+            setLeaderboard(data.leaderboard);
+            setLeaderboardStats({
+              totalUsers: data.totalUsers,
+              totalUniqueHexagons: data.totalUniqueHexagons
+            });
+          }
+        } catch (error) {
+          console.error('Failed to fetch leaderboard:', error);
+        }
+      };
+
+      fetchLeaderboard();
+      const leaderboardInterval = setInterval(fetchLeaderboard, 5000);
     }
 
     init();
@@ -407,6 +440,70 @@ export default function GoogleHexGridMap() {
         </label>
         <div className="text-xs text-gray-500 mt-1">
           View all hexagons where players can move
+        </div>
+      </div>
+
+      {/* Leaderboard */}
+      <div className="absolute bottom-4 right-4 bg-white shadow-lg rounded-lg p-4 z-10 w-80 max-h-96 overflow-hidden">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-gray-800">Exploration Leaderboard</h3>
+          <div className="text-xs text-gray-500">
+            Updates every 5s
+          </div>
+        </div>
+        
+        <div className="text-xs text-gray-600 mb-3 space-y-1">
+          <div>Total Players: {leaderboardStats.totalUsers}</div>
+          <div>Active Areas: {leaderboardStats.totalUniqueHexagons}</div>
+        </div>
+
+        <div className="max-h-64 overflow-y-auto space-y-2">
+          {leaderboard.map((entry, index) => (
+            <div 
+              key={entry.username}
+              className="flex items-center justify-between p-2 rounded bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+              onClick={() => {
+                // Clear any existing history first
+                clearPlayerHistory();
+                // Show this player's history by calling the existing function
+                const map = (mapRef.current as any)?._map;
+                if (window.google && map) {
+                  showPlayerHistory(entry.username, window.google, map);
+                }
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="text-sm font-medium text-gray-600">
+                  #{index + 1}
+                </div>
+                <div>
+                  <div 
+                    className="font-medium text-sm"
+                    style={{ color: generatePlayerColor(entry.username) }}
+                  >
+                    {entry.username}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {entry.lastActive ? 
+                      `Active ${new Date(entry.lastActive).toLocaleDateString()}` : 
+                      'Never active'
+                    }
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="font-bold text-sm text-gray-800">
+                  {entry.hexagonsExplored}
+                </div>
+                <div className="text-xs text-gray-500">areas</div>
+              </div>
+            </div>
+          ))}
+          {leaderboard.length === 0 && (
+            <div className="text-center text-gray-500 text-sm py-4">
+              No players found
+            </div>
+          )}
         </div>
       </div>
 
