@@ -417,33 +417,42 @@ export default function GoogleHexGridMap() {
 
       {selectedPlayerName && (
         <div className="absolute top-4 left-4 z-10 max-w-sm">
-          <div className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-md border border-slate-700/50 shadow-2xl rounded-2xl p-5 transition-all duration-300 hover:shadow-cyan-500/20">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-transparent bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-lg">
-                  {selectedPlayerName}&apos;s History
-                </h3>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
-                  <p className="text-sm text-slate-300">
-                    {selectedPlayerHistory?.length || 0} data points
-                  </p>
-                </div>
-              </div>
+          <div className="terminal-container">
+            <div className="terminal-header">
+              <div className="terminal-dots"></div>
+              <span className="text-accent-primary">player_trace.sh</span>
               <button
                 onClick={clearPlayerHistory}
-                className="ml-4 px-4 py-2 bg-gradient-to-r from-red-500/20 to-red-600/20 hover:from-red-500/30 hover:to-red-600/30 border border-red-500/30 rounded-xl text-red-300 text-sm font-medium transition-all duration-200 hover:scale-105"
+                className="ml-auto text-xs text-accent-secondary hover:text-text-primary transition-colors"
               >
-                Clear
+                [X]
               </button>
             </div>
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center gap-2" style={{ color: generatePlayerColor(selectedPlayerName) }}>
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: generatePlayerColor(selectedPlayerName) }}></div>
-                <span className="text-xs font-medium">Movement path and exploration area</span>
+            
+            <div className="p-4">
+              <div className="command-prompt mb-3">
+                ./trace_user.sh {selectedPlayerName}
               </div>
-              <div className="text-slate-400 text-xs pl-5">
-                Enable &quot;Show Complete Grid&quot; to see all explored hexagons
+              
+              <div className="pl-4 space-y-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="text-accent-secondary">USER:</span>
+                  <span className="text-accent-primary font-semibold">{selectedPlayerName}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-accent-secondary">DATAPOINTS:</span>
+                  <span className="text-terminal-primary">{selectedPlayerHistory?.length || 0}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-accent-secondary">PATH_COLOR:</span>
+                  <div 
+                    className="w-3 h-3 rounded border border-accent-primary/50" 
+                    style={{ backgroundColor: generatePlayerColor(selectedPlayerName) }}
+                  ></div>
+                </div>
+                <div className="text-terminal-secondary text-xs pt-2 border-t border-accent-primary/20">
+                  Movement path and hexagon exploration areas now visible on map
+                </div>
               </div>
             </div>
           </div>
@@ -452,119 +461,136 @@ export default function GoogleHexGridMap() {
 
       {/* Grid toggle control */}
       <div className="absolute top-4 right-4 z-10">
-        <div className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-md border border-slate-700/50 shadow-2xl rounded-2xl p-4 transition-all duration-300 hover:shadow-cyan-500/20">
-          <label className="flex items-center gap-3 text-sm cursor-pointer group">
-            <div className="relative">
-              <input
-                type="checkbox"
-                checked={showCompleteGrid}
-                onChange={(e) => {
-                  setShowCompleteGrid(e.target.checked);
-                  // Toggle grid visibility
-                  completeGridPolygonsRef.current.forEach((polygon) => {
-                    polygon.setVisible(e.target.checked);
-                  });
-                }}
-                className="sr-only"
-              />
-              <div className={`w-12 h-6 rounded-full border-2 transition-all duration-300 ${showCompleteGrid ? 'bg-gradient-to-r from-cyan-500 to-blue-500 border-cyan-400' : 'bg-slate-700 border-slate-600'}`}>
-                <div className={`w-4 h-4 bg-white rounded-full shadow-lg transform transition-transform duration-300 ${showCompleteGrid ? 'translate-x-6' : 'translate-x-0'} mt-0.5 ml-0.5`}></div>
+        <div className="terminal-container">
+          <div className="terminal-header">
+            <div className="terminal-dots"></div>
+            <span className="text-accent-primary">grid_toggle.sh</span>
+          </div>
+          
+          <div className="p-4">
+            <div className="command-prompt mb-3">
+              ./toggle_hex_grid.sh
+            </div>
+            
+            <div className="pl-4">
+              <label className="flex items-center gap-3 text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showCompleteGrid}
+                  onChange={(e) => {
+                    setShowCompleteGrid(e.target.checked);
+                    completeGridPolygonsRef.current.forEach((polygon) => {
+                      polygon.setVisible(e.target.checked);
+                    });
+                  }}
+                  className="sr-only"
+                />
+                <div className={`relative w-8 h-4 rounded border transition-all duration-300 ${
+                  showCompleteGrid 
+                    ? 'bg-accent-primary border-accent-primary' 
+                    : 'bg-terminal-primary border-accent-primary/30'
+                }`}>
+                  <div className={`absolute w-2 h-2 bg-terminal-primary rounded-full top-0.5 transition-transform duration-300 ${
+                    showCompleteGrid ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}></div>
+                </div>
+                <span className={`transition-colors duration-200 ${
+                  showCompleteGrid ? 'text-accent-primary' : 'text-terminal-secondary'
+                }`}>
+                  COMPLETE_GRID: {showCompleteGrid ? 'ON' : 'OFF'}
+                </span>
+              </label>
+              <div className="text-terminal-secondary text-xs mt-2 opacity-70">
+                Show all navigable hexagon areas
               </div>
             </div>
-            <span className="text-slate-200 font-medium group-hover:text-cyan-300 transition-colors duration-200">Show Complete Grid</span>
-          </label>
-          <div className="text-xs text-slate-400 mt-2 pl-15">
-            View all hexagons where players can move
           </div>
         </div>
       </div>
 
-      {/* Leaderboard */}
-      <div className="absolute bottom-4 right-4 z-10 w-80 max-h-96">
-        <div className="bg-gradient-to-br from-slate-900/95 to-slate-800/95 backdrop-blur-md border border-slate-700/50 shadow-2xl rounded-2xl p-5 transition-all duration-300 hover:shadow-cyan-500/20">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full animate-pulse"></div>
-              <h3 className="font-bold text-transparent bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-lg">
-                Exploration Leaderboard
-              </h3>
-            </div>
-            <div className="px-3 py-1 bg-slate-800/80 border border-slate-600/50 rounded-full">
-              <div className="text-xs text-cyan-300 font-mono">
-                LIVE • 5s
-              </div>
-            </div>
+      {/* Terminal Leaderboard */}
+      <div className="absolute bottom-4 right-4 z-10 w-80" style={{ maxHeight: 'calc(100vh - 2rem)' }}>
+        <div className="terminal-container h-full flex flex-col">
+          <div className="terminal-header">
+            <div className="terminal-dots"></div>
+            <span className="text-accent-primary">leaderboard.sh</span>
+            <div className="ml-auto text-xs text-terminal-secondary status-online">LIVE</div>
           </div>
           
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-slate-800/50 border border-slate-600/30 rounded-xl p-3">
-              <div className="text-xs text-slate-400 uppercase tracking-wide">Total Players</div>
-              <div className="text-xl font-bold text-cyan-300 font-mono">{leaderboardStats.totalUsers}</div>
+          <div className="p-4 flex-1 flex flex-col">
+            <div className="command-prompt mb-4">
+              ./get_player_stats.sh --realtime
             </div>
-            <div className="bg-slate-800/50 border border-slate-600/30 rounded-xl p-3">
-              <div className="text-xs text-slate-400 uppercase tracking-wide">Active Areas</div>
-              <div className="text-xl font-bold text-blue-300 font-mono">{leaderboardStats.totalUniqueHexagons}</div>
-            </div>
-          </div>
+            
+            <div className="pl-4 space-y-4 flex-1 flex flex-col">
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-terminal-secondary border border-accent-primary/20 rounded p-2">
+                  <div className="text-accent-secondary">ACTIVE_USERS:</div>
+                  <div className="text-accent-primary font-mono text-lg">{leaderboardStats.totalUsers.toString().padStart(3, '0')}</div>
+                </div>
+                <div className="bg-terminal-secondary border border-accent-primary/20 rounded p-2">
+                  <div className="text-accent-secondary">HEXAGONS:</div>
+                  <div className="text-accent-primary font-mono text-lg">{leaderboardStats.totalUniqueHexagons.toString().padStart(3, '0')}</div>
+                </div>
+              </div>
+              
+              <div className="text-accent-secondary text-xs mb-2">RANKING_TABLE:</div>
 
-          <div className="max-h-64 overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-            {leaderboard.map((entry, index) => (
-              <div 
-                key={entry.username}
-                className="group relative overflow-hidden rounded-xl bg-gradient-to-r from-slate-800/60 to-slate-700/60 hover:from-slate-700/80 hover:to-slate-600/80 border border-slate-600/30 hover:border-cyan-500/30 p-3 transition-all duration-300 cursor-pointer hover:scale-[1.02] hover:shadow-lg"
-                onClick={() => {
-                  // Clear any existing history first
-                  clearPlayerHistory();
-                  // Show this player's history by calling the existing function
-                  const map = (mapRef.current as any)?._map;
-                  if (window.google && map) {
-                    showPlayerHistory(entry.username, window.google, map);
-                  }
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 ${
-                      index === 0 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-yellow-900' :
-                      index === 1 ? 'bg-gradient-to-r from-gray-300 to-gray-500 text-gray-800' :
-                      index === 2 ? 'bg-gradient-to-r from-amber-600 to-amber-800 text-amber-100' :
-                      'bg-slate-700 text-slate-300'
-                    }`}>
-                      #{index + 1}
-                    </div>
-                    <div>
-                      <div 
-                        className="font-bold text-sm group-hover:text-cyan-300 transition-colors duration-200"
-                        style={{ color: generatePlayerColor(entry.username) }}
-                      >
-                        {entry.username}
+              <div className="flex-1 overflow-y-auto space-y-1 font-mono text-xs min-h-0">
+                {leaderboard.map((entry, index) => (
+                  <div 
+                    key={entry.username}
+                    className="group relative p-2 border border-accent-primary/20 rounded hover:border-accent-primary/40 bg-terminal-secondary/50 cursor-pointer transition-all duration-200 hover:bg-accent-primary/5"
+                    onClick={() => {
+                      clearPlayerHistory();
+                      const map = (mapRef.current as any)?._map;
+                      if (window.google && map) {
+                        showPlayerHistory(entry.username, window.google, map);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-6 h-6 rounded flex items-center justify-center font-bold text-xs ${
+                          index === 0 ? 'bg-accent-primary text-terminal-primary' :
+                          index === 1 ? 'bg-accent-secondary text-terminal-primary' :
+                          index === 2 ? 'bg-terminal-secondary text-accent-primary border border-accent-primary' :
+                          'bg-terminal-primary text-terminal-secondary border border-accent-primary/30'
+                        }`}>
+                          {(index + 1).toString().padStart(2, '0')}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div 
+                            className="font-semibold text-xs truncate group-hover:text-accent-primary transition-colors"
+                            style={{ color: generatePlayerColor(entry.username) }}
+                          >
+                            {entry.username}
+                          </div>
+                          <div className="text-terminal-secondary text-xs opacity-70">
+                            {entry.lastActive ? 
+                              new Date(entry.lastActive).toLocaleDateString('en-US', {month: 'short', day: 'numeric'}) : 
+                              'OFFLINE'
+                            }
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-xs text-slate-400 font-mono">
-                        {entry.lastActive ? 
-                          `${new Date(entry.lastActive).toLocaleDateString()}` : 
-                          'INACTIVE'
-                        }
+                      <div className="text-right">
+                        <div className="text-accent-primary font-bold">
+                          {entry.hexagonsExplored.toString().padStart(3, '0')}
+                        </div>
+                        <div className="text-terminal-secondary text-xs">hex</div>
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="font-bold text-lg text-cyan-300 font-mono">
-                      {entry.hexagonsExplored}
-                    </div>
-                    <div className="text-xs text-slate-400 uppercase tracking-wide">areas</div>
+                ))}
+                {leaderboard.length === 0 && (
+                  <div className="text-center text-terminal-secondary py-6">
+                    <div className="loading-spinner mx-auto mb-3"></div>
+                    <div className="text-xs">scanning_for_active_users...</div>
                   </div>
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-xl"></div>
+                )}
               </div>
-            ))}
-            {leaderboard.length === 0 && (
-              <div className="text-center text-slate-400 text-sm py-8">
-                <div className="w-12 h-12 bg-slate-700 rounded-full mx-auto mb-3 flex items-center justify-center">
-                  <div className="w-6 h-6 border-2 border-slate-500 border-t-cyan-400 rounded-full animate-spin"></div>
-                </div>
-                Scanning for players...
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

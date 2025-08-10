@@ -102,4 +102,14 @@ export const TASKS_BY_LOCATION: Task[] = [
     37.8021,
     -122.4187,
   ),
+  createTask(
+    "delve ai",
+    "Take a selfie",
+    "Take a selfie",
+    "Delve AI",
+    100,
+    "hard",
+    37.789687,
+    -122.394394,
+  )
 ];
