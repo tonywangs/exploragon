@@ -63,21 +63,33 @@ export default function UserPage() {
           title: `${username} (You)`,
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: "#2563eb",
+            scale: 15,
+            fillColor: "#10b981",
             fillOpacity: 1,
             strokeColor: "#ffffff",
-            strokeWeight: 3,
+            strokeWeight: 5,
           },
+          animation: google.maps.Animation.BOUNCE,
+          zIndex: 1000,
         });
 
         const infoWindow = new google.maps.InfoWindow({
-          content: `<div style="font-weight: bold; color: #2563eb;">${username} (You)</div>`,
+          content: `<div style="font-weight: bold; color: #10b981;">${username} (You)</div>`,
         });
 
         userMarkerRef.current.addListener("click", () => {
           infoWindow.open(map, userMarkerRef.current);
         });
+
+        // Pan to user's location when marker is first created
+        map.panTo({ lat: coords.latitude, lng: coords.longitude });
+        
+        // Stop bouncing after 3 seconds
+        setTimeout(() => {
+          if (userMarkerRef.current) {
+            userMarkerRef.current.setAnimation(null);
+          }
+        }, 3000);
       }
     },
     [username],
@@ -283,19 +295,18 @@ export default function UserPage() {
     }
   }, [username]);
 
-  // Performance optimized map initialization
+  // Simple map initialization copied from admin page
   useEffect(() => {
     if (!isUsernameSet) return;
 
     let map: google.maps.Map | null = null;
-    let google: typeof window.google | null = null;
     const landPolygons: google.maps.Polygon[] = [];
     let cancelled = false;
 
-    async function initMap() {
+    async function init() {
       try {
         setLoadingStep("Loading Google Maps...");
-        google = await loadGoogleMaps(
+        const google = await loadGoogleMaps(
           process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "",
         );
         if (cancelled || !mapRef.current) return;
@@ -305,94 +316,67 @@ export default function UserPage() {
         mapInstanceRef.current = map;
         googleInstanceRef.current = google;
 
-        // Show map immediately for instant feedback
-        setMapLoading(false);
-        
-        // Start location sharing immediately for better UX
-        if (!watchId) {
-          startSharing(map!, google!);
+        setLoadingStep("Loading coastline...");
+        const geojson = (await loadGeoJSON("/sf-coastline.geojson")) as any;
+        const features =
+          geojson?.type === "FeatureCollection"
+            ? (geojson.features ?? [])
+            : geojson?.type === "Feature"
+              ? [geojson]
+              : [];
+
+        for (const feature of features) {
+          if (feature?.geometry) {
+            const polygons = createPolygonFromGeoJSON(
+              google,
+              feature.geometry,
+              map,
+            );
+            landPolygons.push(...polygons);
+          }
         }
 
-        // Load features progressively without blocking
-        const loadFeatures = async () => {
-          try {
-            if (cancelled) return;
+        fitMapToBounds(map, google, SF_BBOX);
 
-            // Load coastline in background (non-blocking)
-            const coastlinePromise = loadGeoJSON("/sf-coastline.geojson")
-              .then((geojson: any) => {
-                if (cancelled) return;
-                const features =
-                  geojson?.type === "FeatureCollection"
-                    ? (geojson.features ?? [])
-                    : geojson?.type === "Feature"
-                      ? [geojson]
-                      : [];
+        setLoadingStep("Drawing hexagons...");
+        // Draw the complete hexagon grid first (behind everything)
+        drawCompleteHexGrid(
+          google,
+          map,
+          SF_BBOX,
+          HEX_RADIUS_M,
+          landPolygons,
+          completeGridPolygonsRef,
+        );
 
-                for (const feature of features) {
-                  if (feature?.geometry && !cancelled && google && map) {
-                    const polygons = createPolygonFromGeoJSON(
-                      google,
-                      feature.geometry,
-                      map,
-                    );
-                    landPolygons.push(...polygons);
-                  }
-                }
+        // Draw task hexagons on top
+        const hexagonData = drawFlatToppedHexGrid(
+          google,
+          map,
+          SF_BBOX,
+          HEX_RADIUS_M,
+          landPolygons,
+          setSelectedTask,
+          taskHexagonPolygonsRef,
+        );
+        setHexagons(hexagonData);
 
-                if (!cancelled && google && map) {
-                  fitMapToBounds(map, google, SF_BBOX);
-                }
-              })
-              .catch((error) => {
-                console.warn("Coastline loading failed, continuing without:", error);
-              });
+        // Load user history
+        loadVisitedHexagons();
 
-            // Draw only task hexagons initially (much faster)
-            const maxHexagons = isMobile ? 30 : 100; // Reduced for faster initial load
-
-            const hexagonData = drawFlatToppedHexGrid(
-              google!,
-              map!,
-              SF_BBOX,
-              HEX_RADIUS_M,
-              [], // Start without coastline mask for speed
-              setSelectedTask,
-              taskHexagonPolygonsRef,
-              maxHexagons,
-            );
-            setHexagons(hexagonData);
-
-            // Load complete grid lazily after initial render
-            setTimeout(() => {
-              if (cancelled || !google || !map) return;
-              drawCompleteHexGrid(
-                google,
-                map,
-                SF_BBOX,
-                HEX_RADIUS_M,
-                landPolygons,
-                completeGridPolygonsRef,
-              );
-            }, 2000);
-
-            // Load user history in background
-            setTimeout(() => {
-              if (!cancelled) {
-                loadVisitedHexagons();
-              }
-            }, 3000);
-
-            // Wait for coastline to finish
-            await coastlinePromise;
-          } catch (error) {
-            console.error("Error loading map features:", error);
-            // Map still works without additional features
-          }
+        setMapLoading(false);
+        
+        // Create initial user marker at default center
+        const defaultCoords: Coords = {
+          latitude: DEFAULT_CENTER.lat,
+          longitude: DEFAULT_CENTER.lng
         };
-
-        // Start loading features without blocking
-        loadFeatures();
+        updateUserMarker(defaultCoords, map, google);
+        
+        // Start location sharing
+        if (!watchId) {
+          startSharing(map, google);
+        }
       } catch (error) {
         console.error("Error initializing map:", error);
         setMapError(
@@ -402,7 +386,7 @@ export default function UserPage() {
       }
     }
 
-    initMap();
+    init();
 
     return () => {
       cancelled = true;
