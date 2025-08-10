@@ -18,7 +18,11 @@ export class GPSManager {
   }
 
   async sendUpdate(coords: Coords): Promise<void> {
-    const username = this.usernameRef.current?.value?.trim() || "demo-user";
+    const username = this.usernameRef.current?.value?.trim();
+    if (!username) {
+      this.setStatusMsg("Username not set");
+      return;
+    }
     const now = Date.now();
     if (now - this.lastSentAtMs < MIN_INTERVAL_MS) return;
     this.lastSentAtMs = now;

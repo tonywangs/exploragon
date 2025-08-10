@@ -1,3 +1,5 @@
+"use server";
+
 import Redis from "ioredis";
 
 export type GpsCoords = {
@@ -19,14 +21,11 @@ export type UserLocationRecord = {
 export type ActiveUsersDict = Record<string, UserLocationRecord>;
 
 const REDIS_URL = process.env.REDIS_URL || "redis://127.0.0.1:6379";
-export const ACTIVE_TTL_SECONDS = parseInt(
-  process.env.ACTIVE_TTL_SECONDS || "120",
-  10,
-);
+const ACTIVE_TTL_SECONDS = 120;
 
 const globalForRedis = globalThis as unknown as { _redis?: Redis };
 
-export function getRedis(): Redis {
+export async function getRedis(): Promise<Redis> {
   if (!globalForRedis._redis) {
     const client = new Redis(REDIS_URL, {
       maxRetriesPerRequest: 2,
@@ -48,7 +47,7 @@ function userKey(username: string): string {
 export async function setUserLocation(
   record: UserLocationRecord,
 ): Promise<void> {
-  const redis = getRedis();
+  const redis = await getRedis();
   const key = userKey(record.username);
   const value = JSON.stringify(record);
   // Expire to naturally prune inactive users
@@ -58,13 +57,13 @@ export async function setUserLocation(
 export async function getUserLocation(
   username: string,
 ): Promise<UserLocationRecord | null> {
-  const redis = getRedis();
+  const redis = await getRedis();
   const val = await redis.get(userKey(username));
   return val ? (JSON.parse(val) as UserLocationRecord) : null;
 }
 
 export async function getActiveUsers(): Promise<ActiveUsersDict> {
-  const redis = getRedis();
+  const redis = await getRedis();
   const pattern = "gps:user:*";
   let cursor = "0";
   const result: ActiveUsersDict = {};
