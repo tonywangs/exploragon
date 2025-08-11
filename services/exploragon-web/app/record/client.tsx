@@ -166,13 +166,8 @@ export default function RecordClient() {
         setUploadedVideoUrl(result.videoUrl);
         setAnalysisResult(result.analysis);
         
-        // Show success briefly, then redirect to map
+        // Show success and wait for user to click button
         setUploadStatus("success");
-        
-        // Redirect to map page after showing the result briefly
-        setTimeout(() => {
-          router.push('/user');
-        }, 2000); // Reduced to 2 seconds for better UX
       } else {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Upload failed');
@@ -398,35 +393,72 @@ export default function RecordClient() {
             <h3 className="font-semibold text-green-300 mb-2">Challenge Submitted!</h3>
             <p className="text-sm text-green-200 mb-4">Your video has been uploaded successfully.</p>
             
-            {/* Analysis Result */}
+            {/* Analysis Result - Mobile Optimized */}
             {analysisResult && (
-              <div className="mb-4 p-3 bg-slate-700/30 rounded-lg border border-slate-600/30">
+              <div className="mb-6 p-4 bg-slate-700/30 rounded-xl border border-slate-600/30">
                 {analysisResult.success ? (
-                  <div className="text-center">
-                    <p className="text-sm text-cyan-300 mb-2">
-                      {analysisResult.challengeCompleted ? "✅ Challenge Completed!" : "❌ Challenge Not Completed"}
-                    </p>
-                    <p className="text-xs text-slate-300">
-                      AI Analysis: {analysisResult.challengeCompleted ? "Successfully verified" : "Did not meet requirements"}
-                    </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        analysisResult.challengeCompleted 
+                          ? 'bg-green-500/20 border border-green-400/30' 
+                          : 'bg-red-500/20 border border-red-400/30'
+                      }`}>
+                        {analysisResult.challengeCompleted ? (
+                          <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        )}
+                      </div>
+                      <span className={`text-lg font-semibold ${
+                        analysisResult.challengeCompleted ? 'text-green-300' : 'text-red-300'
+                      }`}>
+                        {analysisResult.challengeCompleted ? "Challenge Completed!" : "Challenge Not Completed"}
+                      </span>
+                    </div>
+                    
+                    <div className="text-center">
+                      <p className="text-sm text-slate-300">
+                        {analysisResult.challengeCompleted 
+                          ? "🎉 Great job! You successfully completed this challenge."
+                          : "Keep trying! You can attempt this challenge again."
+                        }
+                      </p>
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-center">
-                    <p className="text-sm text-yellow-300 mb-2">⚠️ Analysis Pending</p>
-                    <p className="text-xs text-slate-300">
-                      {analysisResult.message || "Video submitted for manual review"}
-                    </p>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-yellow-500/20 border border-yellow-400/30 flex items-center justify-center">
+                        <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                      </div>
+                      <span className="text-lg font-semibold text-yellow-300">Analysis Pending</span>
+                    </div>
+                    
+                    <div className="text-center">
+                      <p className="text-sm text-slate-300">
+                        {analysisResult.message || "Video submitted for manual review"}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
             )}
             
-            <p className="text-xs text-green-300 mb-4">Redirecting to map in 2 seconds...</p>
             <button
               onClick={() => router.push('/user')}
-              className="bg-green-600 hover:bg-green-700 text-white font-medium py-3 px-6 rounded-xl transition-colors"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold py-4 px-6 rounded-2xl transition-all duration-300 shadow-lg hover:scale-[1.02] flex items-center justify-center gap-3"
             >
-              Back to Map Now
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              Go Back to Main
             </button>
           </div>
         )}
