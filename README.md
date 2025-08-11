@@ -36,8 +36,8 @@ Real-time multiplayer is about data synchronization, not just WebSocket connecti
 **What's next for Exploragon**  
 Exploragon has the potential to be a group bonding activity, a weekend game, or a long-term challenge. We'll add more landmarks, more tasks, and create a cohesive point system for scoring.
 
-Some more ideas:  
-Expanding beyond San Francisco requires dynamic hex grid generation for any city worldwide. We're implementing automated boundary detection using OpenStreetMap data and adaptive grid density based on population metrics.
-Machine learning models trained on successful completion patterns could generate procedural challenges tailored to specific locations and user skill levels. The current static task list is just the beginning.
-Blockchain integration for permanent hex ownership records and tradeable location NFTs. Imagine owning digital real estate mapped to actual geography, with smart contracts handling territory transfers and reward distribution.
+**Some more ideas:**  
+Expanding beyond San Francisco requires dynamic hex grid generation for any city worldwide. We're implementing automated boundary detection using OpenStreetMap data and adaptive grid density based on population metrics.  
+Machine learning models trained on successful completion patterns could generate procedural challenges tailored to specific locations and user skill levels. The current static task list is just the beginning.  
+Blockchain integration for permanent hex ownership records and tradeable location NFTs. Imagine owning digital real estate mapped to actual geography, with smart contracts handling territory transfers and reward distribution.  
 WebRTC peer-to-peer networking could eliminate server dependencies for real-time position sharing, creating a fully decentralized exploration network that scales infinitely without infrastructure costs.
