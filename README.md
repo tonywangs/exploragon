@@ -4,6 +4,12 @@ City exploration, gamified.
 
 We divided San Francisco into 1000 GPS-tracked hexagons. Exploragon is a 24-hour city exploration challenge; completing location-specific tasks in each hexagon lets you claim the hexagon, allowing you to compete against friend groups or strangers for citywide dominance. Each zone’s difficulty and point value scale with its significance, from quick selfies in quiet neighborhoods to creative challenges at major landmarks. All submissions go through multimodal AI verification, checking both task completion and location authenticity via Gemini video and photo analysis. The system uses real-time multi-user GPS tracking, strict hex partitioning, and our model's binary pass/fail scoring.  
 
+<img src="gallery.jpg" alt="gallery.jpg" class="project-image" width="100%">
+<img src="gallery (1).jpg" alt="gallery.jpg" class="project-image" width="100%">
+<img src="gallery (2).jpg" alt="gallery.jpg" class="project-image" width="100%">
+<img src="gallery (3).jpg" alt="gallery.jpg" class="project-image" width="100%">
+<img src="gallery (4).jpg" alt="gallery.jpg" class="project-image" width="100%">
+
 **How we built it**  
 Next.js 15 frontend with React 19 handles the real-time map interface. Redis manages location streams with 2-second GPS throttling and automatic TTL expiration for active user tracking. The hexagon grid uses H3 spatial indexing overlaid on Google Maps, with 100-meter radius cells covering SF's 121.6 square kilometers. Location verification runs server-side coordinate validation against GeoJSON boundary polygons.
 Video capture uses WebRTC MediaRecorder API with VP9/Opus encoding, streaming directly to our upload endpoint. Gemini 1.5 Pro processes video frames for task completion verification; no fuzzy scoring, just binary pass/fail based on prompt engineering that forces strict "true"/"false" responses. The AI pipeline converts video to base64, sends structured prompts with task context, and parses responses for challenge validation.
