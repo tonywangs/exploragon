@@ -4,6 +4,7 @@ City exploration, gamified.
 
 We divided San Francisco into 1000 GPS-tracked hexagons. Exploragon is a 24-hour city exploration challenge; completing location-specific tasks in each hexagon lets you claim the hexagon, allowing you to compete against friend groups or strangers for citywide dominance. Each zone’s difficulty and point value scale with its significance, from quick selfies in quiet neighborhoods to creative challenges at major landmarks. All submissions go through multimodal AI verification, checking both task completion and location authenticity via Gemini video and photo analysis. The system uses real-time multi-user GPS tracking, strict hex partitioning, and our model's binary pass/fail scoring.  
 
+<img src="https://github.com/tonywangs/exploragon/blob/main/example-images/gallery.jpg" width="400">
 <img src="gallery.jpg" alt="gallery.jpg" class="project-image" width="100%">
 <img src="gallery (1).jpg" alt="gallery.jpg" class="project-image" width="100%">
 <img src="gallery (2).jpg" alt="gallery.jpg" class="project-image" width="100%">
